@@ -11,7 +11,7 @@ from fl.utils import load_config
 
 def test_se_activa_desde_la_configuracion():
     codec = build_codec(load_config(overrides=["server.codec=topk", "server.topk_fraction=0.2"]).server)
-    assert isinstance(codec, topkCodeDecode) and codec.fraction == 0.2
+    assert isinstance(codec, topkCodeDecode) and codec.fraccion == 0.2
 
 
 def test_subida_ocupa_el_doble_de_la_fraccion():
