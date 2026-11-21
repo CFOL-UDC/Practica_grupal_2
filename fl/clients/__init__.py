@@ -3,12 +3,13 @@
 from torch.utils.data import Dataset, Subset
 
 from fl.clients.base import Client, ClientUpdate
+from fl.clients.estadisticos import ClienteEstadisticos
 from fl.clients.fedprox import FedProxClient
 from fl.data import Partition
 from fl.utils import Config
 
 
-__all__ = ["Client", "ClientUpdate", "FedProxClient", "build_clients"]
+__all__ = ["Client", "ClientUpdate", "ClienteEstadisticos", "FedProxClient", "build_clients"]
 
 
 def build_clients(dataset: Dataset, partition: Partition, cfg: Config, device: str) -> list[Client]:
@@ -19,7 +20,10 @@ def build_clients(dataset: Dataset, partition: Partition, cfg: Config, device: s
     clients = []
     for cid, indices in enumerate(partition):
         local_data = Subset(dataset, indices)
-        if c.fedprox_mu > 0:
+        if c.get("estadisticos", False):  # reto (con .get: las configuraciones de la práctica no la tienen)
+            minimo = cfg.get("server", {}).get("minimo_clase", 5)
+            clients.append(ClienteEstadisticos(cid, local_data, minimo=minimo, **train_args))
+        elif c.fedprox_mu > 0:
             clients.append(FedProxClient(cid, local_data, mu=c.fedprox_mu, **train_args))
         else:
             clients.append(Client(cid, local_data, **train_args))

@@ -1,0 +1,22 @@
+# Configuración del reto (python reto.py). Como todas, parte de configs/default.yaml y solo indica
+# lo que cambia. Es la que se usa al evaluar el envío.
+#
+# El escenario (100 clientes, 20 rondas, 10 elegidos por ronda, el reparto y los abandonos) lo fija
+# reto.py: partition.*, server.rounds y server.fraction se ignoran.
+#
+# Estrategia (decisiones/reto-estrategia.md): los clientes suben estadísticos de sus datos
+# (ClienteEstadisticos) y el servidor calcula en forma cerrada un discriminante lineal (LDA),
+# descartando a los clientes cuyo envío está manipulado o cuyas etiquetas no son coherentes.
+
+model:
+  name: linear            # lo interpreta fl/reto_models.py
+
+client:
+  estadisticos: true      # el cliente no entrena con SGD: sube cuentas, sumas y dispersión por clase
+
+server:
+  aggregator: lda_robusto
+  codec: estadisticos     # dispersión en int8 por filas + sumas en float16 (< 160 KiB)
+  contraccion: 0.01
+  umbral_coherencia: 0.5
+  minimo_clase: 5

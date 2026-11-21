@@ -23,6 +23,7 @@ client:                   # lo que hace cada cliente en su entrenamiento local
   batch_size: 32
   lr: 0.01
   fedprox_mu: 0.0         # > 0 activa FedProx
+  estadisticos: false     # reto: el cliente sube estadísticos en vez de pesos (ClienteEstadisticos)
 
 server:                   # lo que decide el servidor en cada ronda
   rounds: 30
@@ -30,6 +31,9 @@ server:                   # lo que decide el servidor en cada ronda
   aggregator: fedavg      # nombre registrado en build_aggregator
   codec: none             # nombre registrado en build_codec: none (sin compresión) | int8 | topk
   topk_fraction: 0.1      # solo topk: fracción de componentes que sube cada cliente
+  contraccion: 0.01       # solo lda_robusto: regularización de la covarianza
+  umbral_coherencia: 0.5  # solo lda_robusto: fracción de clases coherentes para fiarse de un cliente
+  minimo_clase: 5         # reto: nº mínimo de ejemplos de una clase para subir su suma
 
 output:
   dir: runs

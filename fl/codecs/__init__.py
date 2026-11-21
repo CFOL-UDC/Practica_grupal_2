@@ -1,6 +1,7 @@
 """Codecs de comunicación: qué viaja por la red. Para añadir uno, registradlo en ``build_codec``."""
 
 from fl.codecs.base import Codec, state_dict_nbytes
+from fl.codecs.estadisticos import estadisticosCodeDecode
 from fl.codecs.int8 import int8CodeDecode
 from fl.codecs.topk import topkCodeDecode
 from fl.utils import Config
@@ -17,4 +18,6 @@ def build_codec(cfg: Config) -> Codec:
         return int8CodeDecode()
     if cfg.codec == "topk":
         return topkCodeDecode(cfg.topk_fraction)
+    if cfg.codec == "estadisticos":
+        return estadisticosCodeDecode()
     raise ValueError(f"Codec desconocido: {cfg.codec!r}")

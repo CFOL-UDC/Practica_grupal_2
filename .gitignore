@@ -14,3 +14,6 @@ data/
 runs/
 .pytest_cache/
 .DS_Store
+
+# Datos del reto (no se suben al repositorio)
+data/reto/
