@@ -29,7 +29,8 @@ class LDARobusto(Aggregator):
 
         try:
             e = {k: v.double() for k, v in update.state_dict.items()}
-
+            
+            # Si algun valor es NaN o infinito, el envio esta roto o manipulado
             for v in e.values():
                 if not torch.isfinite(v).all():
                     return None
@@ -46,7 +47,8 @@ class LDARobusto(Aggregator):
             cuentas = cuentas.round()
             if int(cuentas.sum()) != update.n_samples:
                 return None
-
+            
+            # Tiene que haber una fila de sumas por cada clase con al menos 'minimo' ejemplos
             presentes = cuentas >= self.minimo
             if e["sumas"].shape[0] != int(presentes.sum()):
                 return None
@@ -83,6 +85,7 @@ class LDARobusto(Aggregator):
     def coherencia(self, fiables, precision):
         '''Para cada cliente, fraccion de sus ejemplos cuya clase cuadra con la del resto de clientes'''
 
+        # Media de cada clase con todos los clientes menos él
         sumas = sum(self.sumas(c) for c in fiables)
         cuentas = sum(self.cuentas(c) for c in fiables)
 

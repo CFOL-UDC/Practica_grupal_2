@@ -17,6 +17,7 @@ partition:
 model:
   name: mlp               # mlp | cnn (cnn3x3 y cnn_gn: solo para comparar variantes de la CNN)
   hidden: 200             # solo mlp
+  direcciones: 99         # reto, solo rda: nº de direcciones para la forma de cada clase
 
 client:                   # lo que hace cada cliente en su entrenamiento local
   local_epochs: 1
@@ -34,6 +35,8 @@ server:                   # lo que decide el servidor en cada ronda
   contraccion: 0.01       # solo lda_robusto: regularización de la covarianza
   umbral_coherencia: 0.5  # solo lda_robusto: fracción de clases coherentes para fiarse de un cliente
   minimo_clase: 5         # reto: nº mínimo de ejemplos de una clase para subir su suma
+  mezcla: 0.3             # solo rda_robusto: cuánto de la forma propia de cada clase (0 = LDA)
+  fijar_con: 30           # solo rda_robusto: con cuántos clientes fiables se fijan las direcciones
 
 output:
   dir: runs

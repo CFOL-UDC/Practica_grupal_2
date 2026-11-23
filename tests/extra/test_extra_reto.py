@@ -139,3 +139,65 @@ def test_etiquetas_cambiadas_se_detectan():
     assert not (agregador.sospechosos - {3})
     xt, yt = nubes(semilla=1)
     assert accuracy(estado, xt, yt) > 0.95
+
+
+# ---- Version 2: RDA ----
+
+from fl.aggregators.rda_robusto import RDARobusto
+from fl.reto_models import ModeloRDA
+
+
+def test_modelo_rda_sin_correccion_es_el_lineal():
+    modelo = ModeloRDA(D, C, 4)
+    with torch.no_grad():
+        modelo.weight.normal_()
+        modelo.bias.normal_()
+    x = torch.randn(7, D)
+    assert torch.allclose(modelo(x), x @ modelo.weight.T + modelo.bias)
+
+
+def test_cliente_rda_cabe_en_el_presupuesto():
+    g = torch.Generator().manual_seed(0)
+    x = torch.randn(3000, 384, generator=g)
+    y = torch.arange(100).repeat_interleave(30)  # el peor caso: las 100 clases
+    cliente = ClienteEstadisticos(0, TensorDataset(x, y), minimo=5)
+    modelo = ModeloRDA(384, 100, 99)
+    modelo.proyeccion.normal_()
+    codec = estadisticosCodeDecode()
+    for _ in range(3):  # primera vez (LDA + formas) y las siguientes (solo formas)
+        payload = codec.encode(cliente.local_train(modelo).state_dict, modelo.state_dict())
+        assert sum(t.numel() * t.element_size() for t in payload.values()) <= 160 * 1024
+
+
+def ronda_rda(cls, agregador, modelo, ataque=None):
+    codec = estadisticosCodeDecode()
+    referencia = {k: v.clone() for k, v in modelo.state_dict().items()}
+    updates = []
+    for c in cls:
+        u = c.local_train(modelo)
+        payload = codec.encode(u.state_dict, referencia)
+        if ataque and c.cid in ataque:
+            payload = ataque[c.cid](payload)
+        u.state_dict = codec.decode(payload, referencia)
+        updates.append(u)
+    agregador.global_state = referencia
+    modelo.load_state_dict(agregador.aggregate(updates))
+
+
+def test_rda_usa_las_formas_y_descarta_las_manipuladas():
+    x, y = nubes()
+    cls = clientes(x, y, GRUPOS)
+    modelo = ModeloRDA(D, C, 4)
+    agregador = RDARobusto(clientes_para_fijar=len(GRUPOS))
+    ronda_rda(cls, agregador, modelo)  # 1ª ronda: LDA y se fijan las direcciones
+    assert agregador.proyeccion is not None
+
+    g = torch.Generator().manual_seed(0)
+    ruido = {4: lambda p: {k: v + 0.1 * v.abs().max() * torch.randn(v.shape, generator=g) if v.is_floating_point() else v
+                           for k, v in p.items()}}
+    ronda_rda(cls, agregador, modelo, ruido)  # 2ª ronda: las formas
+    assert agregador.descartados == {4}
+    assert len(agregador.formas) == len(GRUPOS) - 1
+    assert modelo.curvatura.abs().sum() > 0
+    xt, yt = nubes(semilla=1)
+    assert (modelo(xt).argmax(1) == yt).float().mean() > 0.95

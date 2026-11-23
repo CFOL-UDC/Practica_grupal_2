@@ -5,18 +5,23 @@
 # reto.py: partition.*, server.rounds y server.fraction se ignoran.
 #
 # Estrategia (decisiones/reto-estrategia.md): los clientes suben estadísticos de sus datos
-# (ClienteEstadisticos) y el servidor calcula en forma cerrada un discriminante lineal (LDA),
-# descartando a los clientes cuyo envío está manipulado o cuyas etiquetas no son coherentes.
+# (ClienteEstadisticos) y el servidor calcula en forma cerrada el clasificador, descartando a los
+# clientes cuyo envío está manipulado o cuyas etiquetas no son coherentes.
+#   - Versión 1 (LDA):  model.name=linear, server.aggregator=lda_robusto
+#   - Versión 2 (RDA):  model.name=rda,    server.aggregator=rda_robusto   <- la actual
 
 model:
-  name: linear            # lo interpreta fl/reto_models.py
+  name: rda               # lo interpreta fl/reto_models.py
+  direcciones: 99         # direcciones para la forma de cada clase
 
 client:
-  estadisticos: true      # el cliente no entrena con SGD: sube cuentas, sumas y dispersión por clase
+  estadisticos: true      # el cliente no entrena con SGD: sube cuentas, sumas, dispersión y formas
 
 server:
-  aggregator: lda_robusto
-  codec: estadisticos     # dispersión en int8 por filas + sumas en float16 (< 160 KiB)
+  aggregator: rda_robusto
+  codec: estadisticos     # dispersión y formas en int8 por filas + sumas en float16 (< 160 KiB)
   contraccion: 0.01
   umbral_coherencia: 0.5
   minimo_clase: 5
+  mezcla: 0.3             # cuánto de la forma propia de cada clase (0 = LDA)
+  fijar_con: 30           # con cuántos clientes fiables se fijan las direcciones

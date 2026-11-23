@@ -16,6 +16,12 @@ class ClienteEstadisticos(Client):
         # (asi nunca se sube algo calculado con un ejemplo suelto)
         self.minimo = minimo
 
+        # Para RDA: el cliente se acuerda de lo que ya ha mandado (vive toda la simulacion)
+        self.enviado = False
+        self.formas_enviadas = set()
+        self.minimo_forma = 10  # la forma de una clase necesita mas ejemplos que su media
+        self.presupuesto = 160 * 1024  # bytes que se pueden subir por ronda (lo fija el reto)
+
     def local_train(self, global_model: nn.Module) -> ClientUpdate:
         '''Devuelve los estadisticos del cliente en vez de pesos entrenados'''
 
@@ -41,9 +47,49 @@ class ClienteEstadisticos(Client):
 
         estadisticos = {
             "cuentas": cuentas.float(),
-            "sumas": sumas[presentes].float(),
-            "dispersion": dispersion.float(),
             "control": torch.ones(1),  # siempre vale 1, el servidor lo usa para ver si lo han tocado
         }
+        ocupado = 4 * n_clases + 4
+
+        # Con el modelo RDA, lo del LDA solo se manda una vez (los datos no cambian) y se deja
+        # sitio para las formas. Con el modelo lineal se manda siempre, como en la version 1
+        proyeccion = global_model.state_dict().get("proyeccion")
+        if proyeccion is None or not self.enviado:
+            estadisticos["sumas"] = sumas[presentes].float()
+            estadisticos["dispersion"] = dispersion.float()
+            d = x.shape[1]
+            ocupado += 2 * int(presentes.sum()) * d + d * (d + 1) // 2 + 8 * d
+            self.enviado = True
+
+        # RDA: si el modelo global ya trae las direcciones, mandamos la forma de nuestras clases
+        if proyeccion is not None and proyeccion.abs().sum() > 0:
+            formas, clases = self.formas(x, y, cuentas, proyeccion.double(), ocupado)
+            if len(clases) > 0:
+                estadisticos["formas"] = formas.float()
+                estadisticos["formas.clases"] = clases.float()
 
         return ClientUpdate(self.cid, estadisticos, self.n_samples, {})
+
+    def formas(self, x, y, cuentas, proyeccion, ocupado):
+        '''Dispersion de cada clase en las direcciones del servidor, las que quepan en el presupuesto'''
+
+        k = proyeccion.shape[0]
+        por_clase = k * (k + 1) // 2 + 4 * k + 4  # bytes de una forma ya comprimida (ver el codec)
+        caben = max(0, (self.presupuesto - ocupado - 1024) // por_clase)
+
+        # Primero las clases con mas ejemplos, que dan la forma mas fiable
+        pendientes = [c for c in torch.argsort(cuentas, descending=True).tolist()
+                      if cuentas[c] >= self.minimo_forma and c not in self.formas_enviadas]
+        clases = torch.tensor(pendientes[:caben], dtype=torch.long)
+
+        u = x @ proyeccion.T
+        formas = []
+        for c in clases.tolist():
+            uc = u[y == c]
+            centrados = uc - uc.mean(0)
+            formas.append(centrados.T @ centrados / len(uc))
+            self.formas_enviadas.add(c)
+
+        if formas:
+            return torch.stack(formas), clases
+        return torch.zeros(0, k, k), clases

@@ -101,3 +101,58 @@ caso sin ataques son los datos de los propios atacantes.
   ICLR 2022. https://arxiv.org/abs/2006.09365
 - Fisher (1936), *The use of multiple measurements in taxonomic problems*; Hastie, Tibshirani y
   Friedman, *The Elements of Statistical Learning*, §4.3 (LDA y LDA regularizado).
+
+---
+
+# Versión 2: RDA (análisis discriminante regularizado)
+
+**Estado:** confirmada con el simulador. Es la configuración actual de `configs/reto.yaml`.
+
+## Contexto
+
+El LDA supone que **todas las clases tienen la misma forma** (una única covarianza). Es la causa
+principal de la distancia con la regresión logística centralizada (~82 %). Las tres opciones:
+
+| Modelo | Forma de cada clase | Centralizado (clientes vistos) | En el reto |
+|---|---|---|---|
+| LDA | la misma para todas | 77,3 % | versión 1 |
+| QDA | una propia por clase | 60–76 % (pocos datos para estimarla) | no cabe: ~75 KB por clase |
+| RDA | mezcla: (1 − α)·común + α·propia | **82,8 %** (α = 0,1–0,25) | versión 2, en 99 direcciones |
+
+## Decisión
+
+- **Direcciones:** cuando hay `fijar_con = 30` clientes fiables, el servidor fija las 99
+  direcciones en las que más se separan las medias de las clases (las del propio LDA, en espacio
+  blanqueado). Se mandan dentro del modelo global (buffer `proyeccion`) y no cambian más.
+- **Cliente:** con el modelo `rda`, manda lo del LDA solo la primera vez. Si el modelo ya trae
+  direcciones, añade la forma de sus clases (≥ 10 ejemplos) proyectada en ellas, las que quepan en
+  el presupuesto, empezando por las que más ejemplos tienen.
+- **Codec:** cada forma igual que la dispersión (triángulo en int8 con escala por fila). ~5,3 KB
+  por clase.
+- **Agregador (`RDARobusto`, hereda de `LDARobusto`):** integridad y coherencia como en la v1, más
+  comprobaciones de las formas (control, cuentas, clases enteras y válidas, autovalores ≥ 0). Junta
+  las formas de cada clase igual que la dispersión del LDA y las mezcla con la común (α = 0,3).
+- **Modelo (`ModeloRDA`):** la parte lineal es el LDA y se le resta una corrección cuadrática por
+  clase en las 99 direcciones. Es exactamente el clasificador gaussiano con la covarianza de cada
+  clase = la común fuera de las direcciones y la mezclada dentro (identidad de Woodbury).
+
+## Resultados (validación de `reto.py`)
+
+| Escenario | v1 (LDA) | v2 (RDA) |
+|---|---|---|
+| Sin atacantes, semillas 0–2 | 77,2 % | **80,6 %** |
+| Sin atacantes, semillas 3–5 (no usadas para ajustar) | 76,9 % | **80,2 %** |
+| 20 % atacantes, `mezcla` | 76,9 % | **80,4 %** |
+| 20 % atacantes, `mezcla` sobre enteros también | 76,8 % | **80,1 %** |
+| 30 % atacantes | 76,8 % | **79,3 %** |
+| «Todo a la clase 0» | 76,8 % | **80,2 %** |
+
+Ningún cliente honrado marcado en ninguna prueba.
+
+## Ajustes probados
+
+- `fijar_con`: 5 → 78,4 %; 10 → 79,1 %; 30 → **80,6 %**; 50 → 80,5 %; 60 → 80,1 %. Fijar las
+  direcciones pronto deja que más clientes manden formas, pero con pocas clases vistas las
+  direcciones son peores; pesa más lo segundo.
+- `mezcla` (con `fijar_con = 30`): 0,2 → 80,4 %; **0,3 → 80,6 %**; 0,4 → 80,4 %; 0,5 → 80,1 %.
+- Solo la diagonal de cada forma (sin direcciones): no mejora (77,3 %).
