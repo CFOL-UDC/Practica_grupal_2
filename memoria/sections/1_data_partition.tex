@@ -1,7 +1,48 @@
 \section{Repartición de datos}
 
 \subsection{IID}
+Para obtener un reparto IID se utilizó la función de barajado (\texttt{shuffle}) del generador aleatorio que se instanciaba 
+con la librería de NumPy: \texttt{numpy.random.default\_rng(seed)}, y se aplicó sobre los índices de las muestras del
+conjunto de datos. Posteriormente, se calculó el cociente y el residuo entre el número total de muestras y el
+de clientes, de modo que los subconjuntos generados diferían como máximo en una 1 unidad.
 
-\subsection{Dirichlet} 
+\begin{figure}[H]
+    \includegraphics[width=6cm, height=5cm]{1_data_partition/iid_part.png}
+    \caption{Distribución IID empleando 10 clientes}
+\end{figure}
 
-\subsection{Dirchlet Shards}
+\subsection{Dirichlet}
+Tipo de reparto no-IID. Consiste en calcular las proporciones de Dirichlet de cada una de las clases disponibles para determinar
+cuántas muestras de cada clase asignar a un cliente específico de la ronda. El parámetro principal a definir es $\alpha$ que 
+a medida que decrece, los clientes se quedan con menos clases. 
+\\
+Como en este tipo de escenario se tienen clientes
+con particiones de mayor tamaño que otros, se define como restricción que cada cliente tenga como mínimo \texttt{min\_size}
+ejemplos en su muestra, de lo contrario se debe repetir el muestreo.
+
+\begin{figure}[H]
+    \includegraphics[width=6cm, height=5cm]{1_data_partition/dirichlet_part.png}
+    \caption{Distribución no-IID empleando 10 clientes y $\alpha=0.1$}
+\end{figure}
+
+\subsection{Dirichlet Shards}
+A diferencia de la anterior, en esta variante se define el número de clases que debe recibir
+cada cliente mediante el parámetro \texttt{k}. Para asegurarse de que todas
+las clases se cubran se deben satisfacer las siguientes condiciones:
+
+\begin{enumerate}
+    \item $1 \geq k \leq \text{num. clases} \rightarrow$ Cada cliente recibe al menos una
+    clase, y es posible que puede llegar a cubrirlas todas.
+    \item $ k \cdot \text{num. clientes} \geq \text{num. clases}$: Cubrir todas las clases.
+\end{enumerate}
+
+Una vez se cumplen estas condiciones, se implementa un reparto circular de las clases entre los clientes
+para asegurar que cada todas están siendo cubiertas. Después de haber realizado la asignación, se calculan
+las proporciones de Dirichlet dentro de cada cliente para una de sus clases y en función de esto se determina
+el número de muestras que recibirá de cada una de ellas.  
+
+
+\begin{figure}[H]
+    \includegraphics[width=6cm, height=5cm]{1_data_partition/shards_part.png}
+    \caption{Distribución no-IID empleando 10 clientes, $\alpha=0.1$ y $k=2$}
+\end{figure}

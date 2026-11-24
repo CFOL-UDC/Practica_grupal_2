@@ -15,6 +15,9 @@
 
 
 \usepackage{graphicx}
+\usepackage{float}
+
+\graphicspath{ {img/} }
 
 
 \begin{document}
@@ -28,28 +31,30 @@ Hugo Varela Sánchez}
 \institute{Aprendizaje Automático a Gran Escala, Universidade da Coruña}
 
 \maketitle
-              
+
 \begin{abstract}
-Desarrollo de un sistema federado simulado en un solo ordenador. Se gestionaron tareas, 
-tales como el reparto de datos entre los clientes utilizando variantes como IID, Dirichlet y 
-Dirichlet Shards, el entrenamiento de los modelos locales (MPL y CNN) en los clientes y 
-la recepción de sus actualizaciones en el servidor para realizar la agregación mediante algoritmos 
-como FedAVG y SCAFFOLD. También se registró el coste de las comunicaciones implicadas dentro de este 
-proceso. El objetivo principal junto con estas implementaciones es realizar diferentes experimentos 
-que permitan evaluar el impacto de la heterogeneidad de los datos en un sistema federado mediante el 
-registro de resultados y gráficas, así como la variación de los hiperparámetros tanto del lado del 
-cliente como el derl servidor.
+Desarrollo de un sistema federado simulado en un solo ordenador empleando el conjunto
+de datos de \textit{Fashion-MNIST}. Se gestionaron tareas, tales como el reparto de datos 
+entre los clientes utilizando variantes como IID, Dirichlet y Dirichlet Shards, el entrenamiento 
+de los modelos locales (MPL y CNN) en los clientes y la recepción de sus actualizaciones en el 
+servidor para realizar la agregación mediante algoritmos como FedAVG y SCAFFOLD. También se 
+registró el coste de las comunicaciones implicadas dentro de este proceso. El objetivo principal 
+junto con estas implementaciones es realizar diferentes experimentos que permitan evaluar el 
+impacto de la heterogeneidad de los datos en un sistema federado mediante el registro de resultados 
+y gráficas, así como la variación de los hiperparámetros tanto del lado del cliente como el derl servidor.
 
 \keywords{Particionado, Modelos locales, Agregación de resultados}
 \end{abstract}
 
-\include{sections/1_data_partition.tex}
 
-\include{sections/2_models.tex}
 
-\include{sections/3_server_client.tex}
+\input{sections/1_data_partition.tex}
 
-\include{sections/4_experimentos.tex}
+\input{sections/2_models.tex}
+
+\input{sections/3_server_client.tex}
+
+\input{sections/4_experimentos.tex}
 
 
 \end{document}
