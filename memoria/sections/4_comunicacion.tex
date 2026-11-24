@@ -1,0 +1,42 @@
+\section{Comunicación}
+
+\subsection{Medida de bytes}
+El tamaño de un modelo se calcula como la suma, para cada tensor de su \texttt{state\_dict}, del número de
+elementos por los bytes que ocupa cada uno. A partir de esto, en cada ronda se registran:
+
+\begin{itemize}
+    \item \textbf{Bajada}: número de clientes seleccionados por el tamaño del modelo global. La bajada no se comprime.
+    \item \textbf{Subida}: suma del tamaño de lo que envía cada cliente una vez codificado. De este modo, al activar
+    un codec solo se reduce la subida.
+\end{itemize}
+
+No se tiene en cuenta el coste de serialización ni el del protocolo de red. El envío se realiza a través de un
+codec con dos operaciones: \texttt{encode}, que se ejecuta en el cliente, y \texttt{decode}, que reconstruye los
+pesos en el servidor. Ambas reciben como referencia el modelo global de la ronda, que es conocido por los dos
+extremos. El codec por defecto no aplica ninguna transformación.
+
+\subsection{Cuantización int8}
+En lugar de cuantizar directamente los pesos, cada cliente cuantiza la diferencia $\Delta = w^k - w_t$ respecto al
+modelo global, cuyos valores tienen un rango mucho menor y, por tanto, se representan con menos error. Para cada
+tensor se calcula una escala $s = \max|\Delta| / 127$ y se envía:
+\[
+q = \text{clamp}\left(\text{round}\left(\Delta / s\right), -127, 127\right)
+\]
+como un tensor \texttt{int8}, junto con la escala $s$ en \texttt{float32}. Si todas las diferencias son nulas se
+toma $s=1$ para evitar la división entre cero. El servidor reconstruye los pesos como $w_t + q \cdot s$.
+\\
+
+Cada parámetro pasa de ocupar 4 bytes a ocupar 1, más 4 bytes por tensor para la escala, por lo que la subida
+se reduce aproximadamente a la cuarta parte. Este codec se activa con \texttt{- -set server.codec=int8}.
+
+\subsection{Top-k (extensión)}
+Como extensión opcional se implementó una compresión que solo envía las componentes más grandes de la
+actualización. Para cada tensor se calcula de nuevo la diferencia $\Delta$ respecto al modelo global y se
+seleccionan las $k = \lceil f \cdot n \rceil$ componentes de mayor valor absoluto, siendo $f$ la fracción indicada
+en \texttt{server.topk\_fraction} y $n$ el número de elementos del tensor. Se envían sus posiciones en
+\texttt{int32} y sus valores en \texttt{float32}, es decir, 8 bytes por componente. En el servidor, las componentes
+no recibidas se consideran nulas, de modo que esos pesos se mantienen iguales a los del modelo global.
+\\
+
+Al ocupar 8 bytes por componente enviada en lugar de 4, este codec solo reduce la subida si $f < 0.5$. Con el valor
+por defecto $f = 0.1$ la subida se reduce a la quinta parte. Se activa con \texttt{--set server.codec=topk}.

@@ -36,12 +36,12 @@ Hugo Varela Sánchez}
 Desarrollo de un sistema federado simulado en un solo ordenador empleando el conjunto
 de datos de \textit{Fashion-MNIST}. Se gestionaron tareas, tales como el reparto de datos 
 entre los clientes utilizando variantes como IID, Dirichlet y Dirichlet Shards, el entrenamiento 
-de los modelos locales (MPL y CNN) en los clientes y la recepción de sus actualizaciones en el 
+de los modelos locales (MLP y CNN) en los clientes y la recepción de sus actualizaciones en el 
 servidor para realizar la agregación mediante algoritmos como FedAVG y SCAFFOLD. También se 
 registró el coste de las comunicaciones implicadas dentro de este proceso. El objetivo principal 
 junto con estas implementaciones es realizar diferentes experimentos que permitan evaluar el 
 impacto de la heterogeneidad de los datos en un sistema federado mediante el registro de resultados 
-y gráficas, así como la variación de los hiperparámetros tanto del lado del cliente como el derl servidor.
+y gráficas, así como la variación de los hiperparámetros tanto del lado del cliente como el del servidor.
 
 \keywords{Particionado, Modelos locales, Agregación de resultados}
 \end{abstract}
@@ -54,7 +54,9 @@ y gráficas, así como la variación de los hiperparámetros tanto del lado del 
 
 \input{sections/3_server_client.tex}
 
-\input{sections/4_experimentos.tex}
+\input{sections/4_comunicacion.tex}
+
+\input{sections/5_experimentos.tex}
 
 
 \end{document}

@@ -31,14 +31,14 @@ cada cliente mediante el parámetro \texttt{k}. Para asegurarse de que todas
 las clases se cubran se deben satisfacer las siguientes condiciones:
 
 \begin{enumerate}
-    \item $1 \geq k \leq \text{num. clases} \rightarrow$ Cada cliente recibe al menos una
+    \item $1 \leq k \leq \text{num. clases} \rightarrow$ Cada cliente recibe al menos una
     clase, y es posible que puede llegar a cubrirlas todas.
-    \item $ k \cdot \text{num. clientes} \geq \text{num. clases}$: Cubrir todas las clases.
+    \item $ k \cdot \text{num. clientes} \geq \text{num. clases} \rightarrow$ Cubrir todas las clases.
 \end{enumerate}
 
 Una vez se cumplen estas condiciones, se implementa un reparto circular de las clases entre los clientes
-para asegurar que cada todas están siendo cubiertas. Después de haber realizado la asignación, se calculan
-las proporciones de Dirichlet dentro de cada cliente para una de sus clases y en función de esto se determina
+para asegurar que todas están siendo cubiertas. Después de haber realizado la asignación, se calculan
+las proporciones de Dirichlet dentro de cada cliente para cada una de sus clases y en función de esto determinar
 el número de muestras que recibirá de cada una de ellas.  
 
 
