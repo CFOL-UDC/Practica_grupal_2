@@ -1,0 +1,55 @@
+% This is samplepaper.tex, a sample chapter demonstrating the
+% LLNCS macro package for Springer Computer Science proceedings;
+% Version 2.25 of 2026/09/03
+%
+\documentclass[runningheads]{llncs}
+%
+\usepackage[T1]{fontenc}
+% T1 fonts will be used to generate the final print and online PDFs,
+% so please use T1 fonts in your manuscript whenever possible.
+% Other font encondings may result in incorrect characters.
+%
+
+\usepackage{newtxtext}       % 
+\usepackage[varvw]{newtxmath}       % selects Times Roman as basic font
+
+
+\usepackage{graphicx}
+
+
+\begin{document}
+\title{Práctica 2: Aprendizaje Federado}
+
+\author{Alicia Losada Sánchez \and
+Carlos Orejuela Lluncor \and
+Hugo Varela Sánchez}
+
+
+\institute{Aprendizaje Automático a Gran Escala, Universidade da Coruña}
+
+\maketitle
+              
+\begin{abstract}
+Desarrollo de un sistema federado simulado en un solo ordenador. Se gestionaron tareas, 
+tales como el reparto de datos entre los clientes utilizando variantes como IID, Dirichlet y 
+Dirichlet Shards, el entrenamiento de los modelos locales (MPL y CNN) en los clientes y 
+la recepción de sus actualizaciones en el servidor para realizar la agregación mediante algoritmos 
+como FedAVG y SCAFFOLD. También se registró el coste de las comunicaciones implicadas dentro de este 
+proceso. El objetivo principal junto con estas implementaciones es realizar diferentes experimentos 
+que permitan evaluar el impacto de la heterogeneidad de los datos en un sistema federado mediante el 
+registro de resultados y gráficas, así como la variación de los hiperparámetros tanto del lado del 
+cliente como el derl servidor.
+
+\keywords{Particionado, Modelos locales, Agregación de resultados}
+\end{abstract}
+
+\include{sections/1_data_partition.tex}
+
+\include{sections/2_models.tex}
+
+\include{sections/3_server_client.tex}
+
+\include{sections/4_experimentos.tex}
+
+
+\end{document}
