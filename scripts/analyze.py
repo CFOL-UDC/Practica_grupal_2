@@ -36,7 +36,7 @@ FIGURES_DIR = ROOT / "memoria" / "figuras"
 TABLES_DIR = ROOT / "memoria" / "tablas"
 
 # Paleta categórica en orden fijo: el color sigue a la configuración, no a su posición.
-COLORS = ["#2a78d6", "#eb6834", "#1baf7a", "#eda100", "#e87ba4", "#008300", "#6250d6", "#e34948"]
+COLORS = ["#2a78d6", "#eb6834", "#1baf7a", "#eda100", "#e87ba4", "#6b6b6b", "#6250d6", "#e34948"]
 
 # Para cada pregunta: título, qué separa los paneles (None = un solo panel), qué distingue las
 # curvas dentro de un panel y si se dibuja también la accuracy frente a los MB transmitidos.
@@ -194,12 +194,14 @@ def plot(name, groups, panel_key, curve_key, x="round"):
     legend_rows = -(-len(labels) // legend_cols)
     height = fig.get_figheight()
     header = 0.75 + 0.28 * legend_rows
+    # tight_layout antes de añadir título y leyenda: si no, les reserva sitio dos veces.
+    fig.tight_layout()
+    fig.subplots_adjust(top=1 - header / height)
     fig.suptitle(title, fontsize=12, y=1 - 0.12 / height, va="top")
     fig.text(0.5, 1 - 0.42 / height, "media ± desviación típica entre semillas",
              ha="center", va="top", fontsize=9, color="#555555")
     fig.legend(handles, labels, loc="upper center", ncol=legend_cols, frameon=False,
                bbox_to_anchor=(0.5, 1 - 0.62 / height))
-    fig.tight_layout(rect=(0, 0, 1, 1 - header / height))
 
     FIGURES_DIR.mkdir(parents=True, exist_ok=True)
     out = FIGURES_DIR / (f"{name}_accuracy.png" if x == "round" else f"{name}_accuracy_mb.png")
@@ -227,7 +229,6 @@ def main():
         print("   ->", plot(name, groups, panel_key, curve_key).relative_to(ROOT))
         if vs_mb:
             print("   ->", plot(name, groups, panel_key, curve_key, x="mb").relative_to(ROOT))
-
 
 if __name__ == "__main__":
     main()
