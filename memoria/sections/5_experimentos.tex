@@ -196,6 +196,74 @@ alcanza aproximadamente el techo, en no-IID se queda 13 puntos por debajo.
 \\
 
 \subsection{Participación}
+Los escenarios a evaluar son:
+\begin{itemize}
+    \item Fracción de clientes por ronda: $C \in \{0.3, 0.5, 1.0\}$
+    \item Particionado: Dirichlet con $\alpha=0.1$, con 3 semillas (0--2).
+\end{itemize}
+
+El resto de la configuración es la de por defecto y las métricas son las mismas que en los experimentos anteriores.
+Como en este caso se usan 3 semillas, la \textit{accuracy} final con $C=0.5$ ($0.741$) difiere de la de los
+experimentos anteriores ($0.722$, con 5 semillas), debido a la alta variabilidad entre semillas del reparto
+$\alpha=0.1$.
+
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=\textwidth]{q3_accuracy.png}
+    \caption{\textit{Accuracy} de test por ronda para cada fracción de clientes $C$. La línea es la media entre
+    semillas y la banda, $\pm$ una desviación típica.}
+    \label{fig:q3_curvas}
+\end{figure}
+
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=\textwidth]{q3_accuracy_mb.png}
+    \caption{\textit{Accuracy} de test frente a los MB transmitidos acumulados (subida y bajada).}
+    \label{fig:q3_mb}
+\end{figure}
+
+\begin{table}[H]
+    \centering
+    \caption{Resultados del experimento de participación (media $\pm$ desviación típica entre semillas)}
+    \label{tab:q3}
+    \setlength{\tabcolsep}{4pt}
+    \begin{tabular}{lcccccc}
+        \hline
+        $C$ & Clientes & Accuracy final & Oscilación & Salto medio & MB/ronda & MB total \\
+        \hline
+        0.3 & 3 & $0.687 \pm 0.025$ & $0.046 \pm 0.008$ & $0.072 \pm 0.013$ & 4.8 & 143.4 \\
+        0.5 & 5 & $0.741 \pm 0.048$ & $0.028 \pm 0.005$ & $0.033 \pm 0.007$ & 8.0 & 239.1 \\
+        1.0 & 10 & $0.790 \pm 0.017$ & $0.007 \pm 0.002$ & $0.006 \pm 0.000$ & 15.9 & 478.1 \\
+        \hline
+    \end{tabular}
+\end{table}
+
+\subsubsection{Relación entre la accuracy y los bytes transmitidos}
+A medida que aumenta $C$, la \textit{accuracy} final mejora unos 5 puntos en cada
+paso y las curvas se vuelven mucho más estables: la oscilación con $C=1$
+es 4 veces menor que con $C=0.5$ y 6.5 veces menor que con $C=0.3$. Esto confirma que el diente de sierra 
+observado en los experimentos anteriores se debe al muestreo de clientes. Con $C=1$ participan todos los clientes 
+en cada ronda, por lo que la mezcla de clases entrenada es siempre la misma y el modelo global deja de inclinarse 
+hacia las clases de los clientes seleccionados. Con $C=0.3$, en cambio, solo participan 3 clientes y en cada ronda 
+faltan muchas clases, lo que da lugar a la mayor oscilación.
+\\
+
+Sin embargo, incluso con la participación completa la \textit{accuracy} final ($0.790$) queda por debajo de la de
+IID ($0.852$, con $C=0.5$). Que participen todos los clientes elimina la oscilación, pero no el \textit{client
+drift}: cada cliente sigue desplazándose hacia el óptimo de sus pocas clases, y esto es lo que limita el resultado
+final.
+\\
+
+\textbf{Bytes transmitidos.} El coste de comunicación crece de forma proporcional a $C$, ya que cada cliente
+participante descarga el modelo global y sube el suyo. Al representar la \textit{accuracy} frente a los MB 
+transmitidos (Figura~\ref{fig:q3_mb}), las tres curvas prácticamente se solapan, es decir, que básicamente 
+con un mismo presupuesto de comunicación, la \textit{accuracy} es similar independientemente de $C$.
+\\
+
+Con $C=1$, el mayor \textit{accuracy} final se debe a que transmite el doble que $C=0.5$ (478.1 MB frente a 239.1 MB), 
+y ese coste adicional solo aporta unos 5 puntos. La \textit{accuracy} depende principalmente del total de bytes transmitidos, 
+y lo que $C$ decide es cómo se reparten: pocos clientes en muchas rondas, con rondas baratas pero curvas inestables, 
+o muchos clientes en pocas rondas, con rondas caras pero curvas estables.
 
 \subsection{FedAvg frente FedProx}
 
