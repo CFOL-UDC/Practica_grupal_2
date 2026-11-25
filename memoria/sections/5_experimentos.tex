@@ -134,11 +134,66 @@ la estabilidad no indica un buen aprendizaje.
 
 \subsection{Épocas locales}
 
-Experimentos:
+Los escenarios a evaluar son:
 \begin{itemize}
-    \item $E \in \{1, 5\}$
-    \item Particionado: IID y no-IID
+    \item Épocas locales: $E \in \{1, 5\}$
+    \item Particionado:
+        \begin{itemize}
+            \item IID, con 3 semillas (0--2).
+            \item No-IID: Dirichlet con $\alpha=0.1$, con 5 semillas (0--4).
+        \end{itemize}
 \end{itemize}
+
+El resto de la configuración es la de por defecto y las métricas son las mismas que en el experimento anterior.
+Las ejecuciones con $E=1$ son las del experimento de heterogeneidad.
+
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=\textwidth]{q2_accuracy.png}
+    \caption{\textit{Accuracy} de test por ronda con $E=1$ y $E=5$ en cada reparto. La línea es la media entre
+    semillas y la banda, $\pm$ una desviación típica.}
+    \label{fig:q2_curvas}
+\end{figure}
+
+\begin{table}[H]
+    \centering
+    \caption{Resultados del experimento de épocas locales (media $\pm$ desviación típica entre semillas)}
+    \label{tab:q2}
+    \setlength{\tabcolsep}{5pt}
+    \begin{tabular}{llcccc}
+        \hline
+        Reparto & $E$ & Semillas & Accuracy final & Oscilación & Salto medio \\
+        \hline
+        IID & 1 & 3 & $0.852 \pm 0.002$ & $0.004 \pm 0.001$ & $0.002 \pm 0.000$ \\
+        IID & 5 & 3 & $0.886 \pm 0.000$ & $0.002 \pm 0.000$ & $0.002 \pm 0.001$ \\
+        Dirichlet $\alpha=0.1$ & 1 & 5 & $0.722 \pm 0.043$ & $0.034 \pm 0.010$ & $0.040 \pm 0.012$ \\
+        Dirichlet $\alpha=0.1$ & 5 & 5 & $0.757 \pm 0.040$ & $0.033 \pm 0.013$ & $0.040 \pm 0.011$ \\
+        \hline
+    \end{tabular}
+\end{table}
+
+\subsubsection{¿Cómo afecta el número de épocas locales?}
+Aumentar $E$ de 1 a 5 mejora la \textit{accuracy} final en ambos escenarios en una cantidad similar, de unos 3.5
+puntos, y acelera la convergencia.
+\\
+
+\textbf{IID.} Con $E=5$ la \textit{accuracy} final pasa de $0.852$ a $0.886$. Esto ocurre porque el aumento
+de número de epochs locales se traduce a un mayor número de pasos por ronda en cada cliente (188 $\rightarrow$ 940)
+como con datos IID todos los clientes optimizan aproximadamente la misma función, ese trabajo adicional avanza en 
+la misma dirección y se suma al promediar. Algo esperado también era que la convergencia sea más rápida.
+\\
+
+\textbf{No-IID.} En este escenario aumentar $E$ tiene dos efectos opuestos. Por un lado, cada ronda avanza más,
+igual que en IID. Por otro, cada modelo local se desplaza más hacia el óptimo de sus pocas clases, lo que aumenta
+el \textit{client drift}. En nuestros resultados domina el primer efecto: la \textit{accuracy} final pasa de
+$0.722$ a $0.757$, y con $E=5$ se alcanza en unas 10 rondas el valor que $E=1$ obtiene al final.
+\\
+
+Sin embargo, el segundo efecto también está presente: la diferencia con IID no se reduce (13.0 puntos con $E=1$ y
+12.9 con $E=5$) y la oscilación se mantiene igual ($0.034$ frente a $0.033$). Es decir, más épocas locales aceleran
+el aprendizaje, pero no corrigen la penalización por la heterogeneidad de los datos. Mientras que en IID el modelo
+alcanza aproximadamente el techo, en no-IID se queda 13 puntos por debajo.
+\\
 
 \subsection{Participación}
 
