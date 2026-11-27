@@ -193,7 +193,7 @@ def plot(name, groups, panel_key, curve_key, x="round"):
     legend_cols = min(len(labels), 3 if ncols == 1 else 6)
     legend_rows = -(-len(labels) // legend_cols)
     height = fig.get_figheight()
-    header = 0.75 + 0.28 * legend_rows
+    header = 0.75 + 0.28 * legend_rows + (0.3 if panel_key else 0)  # + títulos de los paneles
     # tight_layout antes de añadir título y leyenda: si no, les reserva sitio dos veces.
     fig.tight_layout()
     fig.subplots_adjust(top=1 - header / height)

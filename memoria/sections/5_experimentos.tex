@@ -370,3 +370,53 @@ este error no se acumula, ya que en la siguiente ronda los clientes parten del n
 
 
 \subsection{CNN}
+En este experimento se repite el experimento de heterogeneidad con la CNN descrita en la sección de modelos y se
+compara con el MLP. Se emplean los mismos escenarios y la misma configuración, con 3 semillas (0--2) en todos los
+casos. Para el MLP se reutilizan las ejecuciones del experimento de heterogeneidad con esas 3 semillas, por lo que
+sus valores difieren ligeramente de los obtenidos con 5 semillas (por ejemplo, $0.741$ frente a $0.722$ con
+Dirichlet $\alpha=0.1$).
+
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=\textwidth]{q6_accuracy.png}
+    \caption{\textit{Accuracy} de test por ronda con la CNN y el MLP en cada escenario. La línea es la media entre
+    semillas y la banda, $\pm$ una desviación típica.}
+    \label{fig:q6_curvas}
+\end{figure}
+
+\begin{table}[H]
+    \centering
+    \caption{\textit{Accuracy} final de la CNN y el MLP (media $\pm$ desviación típica entre 3 semillas) y diferencia
+    en puntos}
+    \label{tab:q6}
+    \setlength{\tabcolsep}{5pt}
+    \begin{tabular}{lccc}
+        \hline
+        Escenario & MLP & CNN & Diferencia \\
+        \hline
+        IID & $0.852 \pm 0.002$ & $0.883 \pm 0.002$ & $+3.1$ \\
+        Dirichlet $\alpha=1$ & $0.838 \pm 0.002$ & $0.870 \pm 0.002$ & $+3.2$ \\
+        Dirichlet $\alpha=0.1$ & $0.741 \pm 0.048$ & $0.782 \pm 0.046$ & $+4.1$ \\
+        $k=2$ clases & $0.505 \pm 0.113$ & $0.548 \pm 0.103$ & $+4.3$ \\
+        Centralizado & $0.889 \pm 0.001$ & $0.916 \pm 0.002$ & $+2.7$ \\
+        Solo local ($\alpha=0.1$) & $0.392 \pm 0.018$ & $0.437 \pm 0.014$ & $+4.5$ \\
+        \hline
+    \end{tabular}
+\end{table}
+
+\subsubsection{¿Cómo se compara la CNN con el MLP?}
+La CNN supera al MLP en todos los escenarios, pero la penalización por la heterogeneidad de los datos es
+prácticamente la misma con ambos modelos.
+\\
+
+\textbf{Accuracy.} Como se observa en la Tabla~\ref{tab:q6}, la CNN mejora la \textit{accuracy} final entre 2.7 y
+4.5 puntos, y en la Figura~\ref{fig:q6_curvas} su curva queda por encima de la del MLP prácticamente desde la primera
+ronda. La arquitectura CNN es más apropiada cuando se trata de procesar imágenes como valores de entrada, obteniendo
+características más útiles y empleando un número más pequeño de parámetros con respecto del modelo MLP. La superioridad
+de la red convolucional era de esperarse. Sin embargo, el impacto del \textit{client drift} no se corrige, ya que este 
+depende del reparto de los datos y no de la arquitectura.
+
+
+\textbf{Comunicación.} Al tener menos parámetros, la CNN transmite 2.4 veces menos bytes que el MLP en las mismas 30
+rondas (100.2 MB frente a 239.1 MB). Por tanto, en este caso se obtiene a la vez una mayor \textit{accuracy} y un
+menor coste de comunicación, ya que el tamaño del modelo multiplica directamente el coste de cada ronda.

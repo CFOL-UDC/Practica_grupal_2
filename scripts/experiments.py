@@ -52,7 +52,7 @@ def heterogeneity(model, seeds_iid, seeds_01):
 
 EXPERIMENTS = {
     # Q1. IID, alpha=1, alpha=0.1 y k=2, con centralizado y solo local.
-    #     IID, alpha=0.1 y k=2 llevan 5 semillas porque se reutilizan en Q4 y Q5.
+    #     IID, alpha=0.1 y k=2 llevan 5 semillas; las de IID y alpha=0.1 se reutilizan en Q4 y Q5.
     "q1": heterogeneity([], SEEDS_5, SEEDS_5),
     # Q2. E=1 frente a E=5, con datos IID y no-IID.
     "q2": (
@@ -67,16 +67,15 @@ EXPERIMENTS = {
         for c in ["0.3", "0.5", "1.0"]
         for run in with_seeds(DIR_01 + [f"server.fraction={c}"], SEEDS_3)
     ],
-    # Q4. FedAvg (mu=0) frente a FedProx con tres valores de mu, en tres repartos con E=1
-    #     y en alpha=0.1 con E=5, donde la deriva de los clientes es mayor.
+    # Q4. FedAvg (mu=0) frente a FedProx con tres valores de mu, en IID y en alpha=0.1.
     "q4": [
         run
-        for data in [IID, DIR_01, SHARDS_K2, DIR_01 + E5]
+        for data in [IID, DIR_01]
         for mu in ["0.0"] + MUS
         for run in with_seeds(data + ([f"client.fedprox_mu={mu}"] if mu != "0.0" else []), SEEDS_5)
     ],
-    # Q5. Con y sin cuantización int8 de la subida.
-    "q5": [run for data in [DIR_01, IID] for codec in [[], INT8] for run in with_seeds(data + codec, SEEDS_5)],
+    # Q5. Con y sin cuantización int8 de la subida, con la configuración por defecto (alpha=0.1).
+    "q5": [run for codec in [[], INT8] for run in with_seeds(DIR_01 + codec, SEEDS_5)],
     # Q6. El experimento 1 con la CNN, y las mismas ejecuciones del MLP para comparar.
     "q6": heterogeneity(CNN, SEEDS_3, SEEDS_3) + heterogeneity([], SEEDS_3, SEEDS_3),
     # Variantes de la CNN: la elegida (5x5), filtros 3x3 y con GroupNorm. Las de "cnn" se comparten con Q6.
