@@ -1,0 +1,14 @@
+\section{Modelos implementados}
+
+\subsection{MLP}
+Se implementó el perceptrón multicapa de las diapositivas como una subclase de \texttt{nn.Sequential}. La entrada
+de tamaño $(1, 28, 28)$ se aplana con \texttt{nn.Flatten} y atraviesa dos capas ocultas de 200 neuronas con activación
+ReLU, seguidas de una capa de salida de 10 neuronas:
+\[
+784 \rightarrow 200 \rightarrow 200 \rightarrow 10
+\]
+La última capa devuelve directamente los \textit{logits}, sin aplicar \textit{softmax}, ya que la función de pérdida
+de PyTorch (\texttt{cross\_entropy}) la incorpora internamente. El número de neuronas ocultas se lee del parámetro
+\texttt{hidden} de la configuración, y con el valor por defecto el modelo tiene 199.210 parámetros.
+
+\subsection{CNN}

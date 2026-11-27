@@ -1,0 +1,60 @@
+\section{Implementación de servidor y cliente}
+
+\subsection{Selección de clientes y ronda federada}
+Al comienzo de cada ronda el servidor elige, sin reemplazo, $\max(1, \text{round}(C \cdot K))$ clientes, siendo $C$
+la fracción de participación y $K$ el número total de clientes. Con $K=10$, los valores $C \in \{0.3, 0.5, 1.0\}$
+dan lugar a 3, 5 y 10 clientes respectivamente. El muestreo se realiza con el generador aleatorio propio del
+servidor, que se inicializa con la semilla de la configuración, de modo que la secuencia de clientes elegidos es
+reproducible.
+\\
+
+A continuación se guarda una copia del estado del modelo global $w_t$, que actúa como referencia común entre
+el cliente y el servidor para el codec de comunicación. Cada cliente seleccionado entrena a partir de
+este modelo, codifica su resultado y lo envía al servidor, que lo decodifica. Aunque los clientes se ejecutan uno
+detrás de otro, el modelo global no se modifica hasta que todos han terminado, por lo que todos parten del mismo
+$w_t$ y el resultado es equivalente a un entrenamiento en paralelo. Finalmente, el servidor agrega las
+actualizaciones, carga el nuevo modelo global y lo evalúa sobre el conjunto de test completo de \textit{Fashion-MNIST}.
+\\
+
+Cada ronda registra la \textit{accuracy} y la pérdida sobre el test, la pérdida media de entrenamiento de los
+clientes participantes (\texttt{train\_loss}) y los bytes de subida y bajada.
+
+\subsection{Agregación FedAvg}
+El nuevo modelo global se obtiene como la media de los pesos de los clientes, ponderada por el número de ejemplos
+$n_k$ de cada uno:
+\[
+w_{t+1} = \sum_{k \in S_t} \frac{n_k}{n} \, w_{t+1}^{k}, \qquad n = \sum_{k \in S_t} n_k
+\]
+donde $S_t$ es el conjunto de clientes seleccionados en la ronda. La suma se acumula en \texttt{float64} para evitar
+errores de redondeo y al final se devuelve cada tensor a su tipo original, conservando sus claves y su orden. En
+el caso de los tensores enteros se redondea la media antes de convertirlos. Si los clientes de la ronda no tienen
+ningún ejemplo, se lanza un error en lugar de propagar valores no definidos.
+
+\subsection{Cliente y FedProx}
+El entrenamiento local (\texttt{local\_train}) parte de una copia del modelo global obtenida con
+\texttt{copy.deepcopy}, de forma que este no se modifica. Sobre la copia se entrenan $E$ épocas con SGD, empleando
+mini-lotes barajados de tamaño \texttt{batch\_size}. Al terminar, el cliente devuelve los pesos de su modelo local,
+el número de ejemplos que tiene y la pérdida media obtenida durante el entrenamiento.
+\\
+
+La pérdida de cada mini-lote se calcula mediante el método \texttt{loss}, que en este caso es la entropía cruzada
+al tratarse de un problema de clasificación multiclase. Esto permitió implementar FedProx como una subclase del cliente 
+que únicamente redefine dicho método, añadiendo el término proximal:
+\[
+\mathcal{L}_{\text{FedProx}}(w) = \mathcal{L}_{\text{CE}}(w) + \frac{\mu}{2} \lVert w - w_t \rVert^2
+\]
+Los parámetros del modelo global $w_t$ se separan del grafo de cómputo (\texttt{detach}) para que el gradiente
+solo actúe sobre los pesos locales. El servidor no cambia, ya que FedProx se agrega igualmente con FedAvg, y se
+activa automáticamente cuando $\mu > 0$ en la configuración (\texttt{client.fedprox\_mu}).
+
+\subsection{Referencias}
+Para situar los resultados federados se emplean dos referencias:
+
+\begin{itemize}
+    \item \textbf{Centralizado (techo)}: un único cliente con todos los datos de entrenamiento y $C=1$. Cada
+    ronda equivale a $E$ épocas de entrenamiento convencional.
+    \item \textbf{Solo local (suelo)}: implementado en la clase \texttt{LocalOnly}. Cada cliente conserva su propio
+    modelo entre rondas y lo entrena únicamente con sus datos, sin comunicarse con el servidor. En cada ronda
+    participan todos los clientes, y la \textit{accuracy} registrada es la media de sus modelos evaluados sobre el
+    test global. Al no haber comunicación, los bytes transmitidos son nulos.
+\end{itemize}

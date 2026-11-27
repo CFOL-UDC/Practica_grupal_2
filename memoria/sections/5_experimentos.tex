@@ -1,0 +1,272 @@
+\section{Experimentos}
+
+\subsection{Heterogeneidad}
+Los escenarios a evaluar son:
+\begin{itemize}
+    \item IID:
+    \item Dirichlet $\rightarrow \alpha \in \{0.1; 1\}$
+    \item Dirichlet Shards $\rightarrow \alpha = 0.1;\quad k=2$
+    \item Referencias: 
+        \begin{itemize} 
+            \item Techo: Centralizado
+            \item Suelo: Solo local. Dirichlet con $\alpha=0.1$
+        \end{itemize}
+\end{itemize}
+
+El resto de la configuración es la de por defecto: MLP, $C=0.5$, $E=1$, 30 rondas y SGD con tasa de aprendizaje 
+$0.01$ y mini-lotes de 32 ejemplos.
+
+Los repartos IID, $\alpha=0.1$ y $k=2$ se ejecutaron con 5 semillas (0--4), ya que se reutilizan en experimentos 
+posteriores, y el resto con 3 (0--2).
+\\
+
+Para cada ejecución se calcularon tres métricas, de las que se da la media y la desviación típica entre semillas:
+
+\begin{itemize}
+    \item \textbf{Accuracy final}: media de la \textit{accuracy} de test en las 5 últimas rondas, más robusta que
+    el valor de la última ronda.
+    \item \textbf{Oscilación}: desviación típica de la \textit{accuracy} de test en las 10 últimas rondas.
+    \item \textbf{Salto medio}: media de $|acc_t - acc_{t-1}|$ en las 10 últimas rondas.
+\end{itemize}
+
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=\textwidth]{q1_accuracy.png}
+    \caption{\textit{Accuracy} de test por ronda para cada reparto y las dos referencias. La línea es la media
+    entre semillas y la banda, $\pm$ una desviación típica.}
+    \label{fig:q1_curvas}
+\end{figure}
+
+\begin{table}[H]
+    \centering
+    \caption{Resultados del experimento de heterogeneidad (media $\pm$ desviación típica entre semillas)}
+    \label{tab:q1}
+    \setlength{\tabcolsep}{5pt}
+    \begin{tabular}{lcccc}
+        \hline
+        Configuración & Semillas & Accuracy final & Oscilación & Salto medio \\
+        \hline
+        Centralizado & 3 & $0.888 \pm 0.001$ & $0.003 \pm 0.000$ & $0.003 \pm 0.000$ \\
+        IID & 5 & $0.852 \pm 0.001$ & $0.003 \pm 0.001$ & $0.002 \pm 0.001$ \\
+        Dirichlet $\alpha=1$ & 3 & $0.838 \pm 0.002$ & $0.006 \pm 0.003$ & $0.006 \pm 0.003$ \\
+        Dirichlet $\alpha=0.1$ & 5 & $0.722 \pm 0.043$ & $0.034 \pm 0.010$ & $0.040 \pm 0.012$ \\
+        Shards $k=2$ & 5 & $0.515 \pm 0.086$ & $0.061 \pm 0.030$ & $0.058 \pm 0.027$ \\
+        Solo local & 3 & $0.392 \pm 0.018$ & $0.005 \pm 0.001$ & $0.003 \pm 0.001$ \\
+        \hline
+    \end{tabular}
+\end{table}
+
+\subsubsection{¿Cómo cambia la accuracy final y por qué?}
+La \textit{accuracy} final disminuye a medida que aumenta la heterogeneidad de los datos. Básicamente 
+porque a medida que la distribución de cada cliente se aleja más de la global, esta métrica empeora.
+\\
+
+Con un reparto IID, el valor esperado de la pérdida de cada cliente coincide con la pérdida global,
+$\mathbb{E}[F_k(w)] = f(w)$, por lo que todas las actualizaciones locales apuntan aproximadamente hacia el mismo
+óptimo y promediarlas se comporta de forma parecida a un SGD centralizado. Con $\alpha=1$ todos los clientes tienen
+ejemplos de las 10 clases, aunque en proporciones desiguales, y la pérdida respecto a IID es de solo 1.4 puntos.
+\\
+
+Con $\alpha=0.1$ y $k=2$ la caída es mucho mayor (13 y 34 puntos respecto a IID). Cada cliente solo conoce una o
+dos clases dominantes, de modo que el óptimo de su función local $F_k$ está lejos del óptimo global. Durante el
+entrenamiento local cada modelo se desplaza hacia su propio óptimo (\textit{client drift}) y la media de estos
+modelos no coincide con el óptimo de la función global. A esto se suma una convergencia más lenta: entre las
+rondas 20 y 30, la curva de $\alpha=0.1$ todavía mejora 4.9 puntos frente a 1 punto en IID. Aun así, según la
+teoría, aunque se aumente el número de rondas el resultado se estabiliza por debajo del de IID.
+\\
+
+El caso de $k=2$ es el más extremo, ya que la proporción Dirichlet con $\alpha=0.1$ entre las dos clases de cada
+cliente hace que, en la práctica, la mayoría tenga una sola clase dominante (Figura~\ref{fig:q1_shards}). 
+Además, es la configuración con mayor desviación entre semillas ($\pm 0.086$), porque el reparto depende
+de la semilla.
+\\
+
+Por último, el solo local obtiene el peor resultado porque cada modelo se evalúa sobre el test global, con las 10
+clases equilibradas, pero solo ha visto las pocas clases de su cliente y únicamente es capaz de predecir esas.
+
+\begin{figure}[H]
+    \centering
+    \begin{minipage}{0.32\textwidth}
+        \centering
+        \includegraphics[width=\textwidth]{experiments/1_heterogeneidad/shards_s0.png}\\
+        \small Semilla 0 (acc. $0.407$)
+    \end{minipage}
+    \begin{minipage}{0.32\textwidth}
+        \centering
+        \includegraphics[width=\textwidth]{experiments/1_heterogeneidad/shards_s1.png}\\
+        \small Semilla 1 (acc. $0.479$)
+    \end{minipage}
+    \begin{minipage}{0.32\textwidth}
+        \centering
+        \includegraphics[width=\textwidth]{experiments/1_heterogeneidad/shards_s2.png}\\
+        \small Semilla 2 (acc. $0.626$)
+    \end{minipage}
+    \\[0.3cm]
+    \begin{minipage}{0.32\textwidth}
+        \centering
+        \includegraphics[width=\textwidth]{experiments/1_heterogeneidad/shards_s3.png}\\
+        \small Semilla 3 (acc. $0.490$)
+    \end{minipage}
+    \begin{minipage}{0.32\textwidth}
+        \centering
+        \includegraphics[width=\textwidth]{experiments/1_heterogeneidad/shards_s4.png}\\
+        \small Semilla 4 (acc. $0.573$)
+    \end{minipage}
+    \caption{Reparto Dirichlet Shards ($k=2$, $\alpha=0.1$) con cada semilla y su \textit{accuracy} final.}
+    \label{fig:q1_shards}
+\end{figure}
+
+\subsubsection{¿Cómo cambia la estabilidad de las curvas y por qué?}
+El centralizado, IID y $\alpha=1$ tienen curvas suaves, con una oscilación inferior a $0.006$. Con datos IID
+cualquier subconjunto de 5 clientes es representativo de la distribución global, de modo que la actualización
+agregada apenas depende de qué clientes se hayan seleccionado en la ronda.
+\\
+
+En cambio, la oscilación de $\alpha=0.1$ y $k=2$ es unas 10 y 20 veces mayor que la de IID. Con $C=0.5$ los
+clientes seleccionados cambian en cada ronda, y con ellos la mezcla de clases que se entrena: el modelo global se
+inclina hacia las clases de los clientes elegidos y empeora en las demás, lo que produce curvas en diente de
+sierra.
+\\
+
+Por último, el solo local es estable (oscilación de $0.005$) porque no hay muestreo de clientes ni agregación,
+pero su curva es prácticamente plana: cada modelo solo sigue ajustando las mismas clases, por lo que en este caso
+la estabilidad no indica un buen aprendizaje.
+
+\subsection{Épocas locales}
+
+Los escenarios a evaluar son:
+\begin{itemize}
+    \item Épocas locales: $E \in \{1, 5\}$
+    \item Particionado:
+        \begin{itemize}
+            \item IID, con 3 semillas (0--2).
+            \item No-IID: Dirichlet con $\alpha=0.1$, con 5 semillas (0--4).
+        \end{itemize}
+\end{itemize}
+
+El resto de la configuración es la de por defecto y las métricas son las mismas que en el experimento anterior.
+Las ejecuciones con $E=1$ son las del experimento de heterogeneidad.
+
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=\textwidth]{q2_accuracy.png}
+    \caption{\textit{Accuracy} de test por ronda con $E=1$ y $E=5$ en cada reparto. La línea es la media entre
+    semillas y la banda, $\pm$ una desviación típica.}
+    \label{fig:q2_curvas}
+\end{figure}
+
+\begin{table}[H]
+    \centering
+    \caption{Resultados del experimento de épocas locales (media $\pm$ desviación típica entre semillas)}
+    \label{tab:q2}
+    \setlength{\tabcolsep}{5pt}
+    \begin{tabular}{llcccc}
+        \hline
+        Reparto & $E$ & Semillas & Accuracy final & Oscilación & Salto medio \\
+        \hline
+        IID & 1 & 3 & $0.852 \pm 0.002$ & $0.004 \pm 0.001$ & $0.002 \pm 0.000$ \\
+        IID & 5 & 3 & $0.886 \pm 0.000$ & $0.002 \pm 0.000$ & $0.002 \pm 0.001$ \\
+        Dirichlet $\alpha=0.1$ & 1 & 5 & $0.722 \pm 0.043$ & $0.034 \pm 0.010$ & $0.040 \pm 0.012$ \\
+        Dirichlet $\alpha=0.1$ & 5 & 5 & $0.757 \pm 0.040$ & $0.033 \pm 0.013$ & $0.040 \pm 0.011$ \\
+        \hline
+    \end{tabular}
+\end{table}
+
+\subsubsection{¿Cómo afecta el número de épocas locales?}
+Aumentar $E$ de 1 a 5 mejora la \textit{accuracy} final en ambos escenarios en una cantidad similar, de unos 3.5
+puntos, y acelera la convergencia.
+\\
+
+\textbf{IID.} Con $E=5$ la \textit{accuracy} final pasa de $0.852$ a $0.886$. Esto ocurre porque el aumento
+de número de epochs locales se traduce a un mayor número de pasos por ronda en cada cliente (188 $\rightarrow$ 940)
+como con datos IID todos los clientes optimizan aproximadamente la misma función, ese trabajo adicional avanza en 
+la misma dirección y se suma al promediar. Algo esperado también era que la convergencia sea más rápida.
+\\
+
+\textbf{No-IID.} En este escenario aumentar $E$ tiene dos efectos opuestos. Por un lado, cada ronda avanza más,
+igual que en IID. Por otro, cada modelo local se desplaza más hacia el óptimo de sus pocas clases, lo que aumenta
+el \textit{client drift}. En nuestros resultados domina el primer efecto: la \textit{accuracy} final pasa de
+$0.722$ a $0.757$, y con $E=5$ se alcanza en unas 10 rondas el valor que $E=1$ obtiene al final.
+\\
+
+Sin embargo, el segundo efecto también está presente: la diferencia con IID no se reduce (13.0 puntos con $E=1$ y
+12.9 con $E=5$) y la oscilación se mantiene igual ($0.034$ frente a $0.033$). Es decir, más épocas locales aceleran
+el aprendizaje, pero no corrigen la penalización por la heterogeneidad de los datos. Mientras que en IID el modelo
+alcanza aproximadamente el techo, en no-IID se queda 13 puntos por debajo.
+\\
+
+\subsection{Participación}
+Los escenarios a evaluar son:
+\begin{itemize}
+    \item Fracción de clientes por ronda: $C \in \{0.3, 0.5, 1.0\}$
+    \item Particionado: Dirichlet con $\alpha=0.1$, con 3 semillas (0--2).
+\end{itemize}
+
+El resto de la configuración es la de por defecto y las métricas son las mismas que en los experimentos anteriores.
+Como en este caso se usan 3 semillas, la \textit{accuracy} final con $C=0.5$ ($0.741$) difiere de la de los
+experimentos anteriores ($0.722$, con 5 semillas), debido a la alta variabilidad entre semillas del reparto
+$\alpha=0.1$.
+
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=\textwidth]{q3_accuracy.png}
+    \caption{\textit{Accuracy} de test por ronda para cada fracción de clientes $C$. La línea es la media entre
+    semillas y la banda, $\pm$ una desviación típica.}
+    \label{fig:q3_curvas}
+\end{figure}
+
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=\textwidth]{q3_accuracy_mb.png}
+    \caption{\textit{Accuracy} de test frente a los MB transmitidos acumulados (subida y bajada).}
+    \label{fig:q3_mb}
+\end{figure}
+
+\begin{table}[H]
+    \centering
+    \caption{Resultados del experimento de participación (media $\pm$ desviación típica entre semillas)}
+    \label{tab:q3}
+    \setlength{\tabcolsep}{4pt}
+    \begin{tabular}{lcccccc}
+        \hline
+        $C$ & Clientes & Accuracy final & Oscilación & Salto medio & MB/ronda & MB total \\
+        \hline
+        0.3 & 3 & $0.687 \pm 0.025$ & $0.046 \pm 0.008$ & $0.072 \pm 0.013$ & 4.8 & 143.4 \\
+        0.5 & 5 & $0.741 \pm 0.048$ & $0.028 \pm 0.005$ & $0.033 \pm 0.007$ & 8.0 & 239.1 \\
+        1.0 & 10 & $0.790 \pm 0.017$ & $0.007 \pm 0.002$ & $0.006 \pm 0.000$ & 15.9 & 478.1 \\
+        \hline
+    \end{tabular}
+\end{table}
+
+\subsubsection{Relación entre la accuracy y los bytes transmitidos}
+A medida que aumenta $C$, la \textit{accuracy} final mejora unos 5 puntos en cada
+paso y las curvas se vuelven mucho más estables: la oscilación con $C=1$
+es 4 veces menor que con $C=0.5$ y 6.5 veces menor que con $C=0.3$. Esto confirma que el diente de sierra 
+observado en los experimentos anteriores se debe al muestreo de clientes. Con $C=1$ participan todos los clientes 
+en cada ronda, por lo que la mezcla de clases entrenada es siempre la misma y el modelo global deja de inclinarse 
+hacia las clases de los clientes seleccionados. Con $C=0.3$, en cambio, solo participan 3 clientes y en cada ronda 
+faltan muchas clases, lo que da lugar a la mayor oscilación.
+\\
+
+Sin embargo, incluso con la participación completa la \textit{accuracy} final ($0.790$) queda por debajo de la de
+IID ($0.852$, con $C=0.5$). Que participen todos los clientes elimina la oscilación, pero no el \textit{client
+drift}: cada cliente sigue desplazándose hacia el óptimo de sus pocas clases, y esto es lo que limita el resultado
+final.
+\\
+
+\textbf{Bytes transmitidos.} El coste de comunicación crece de forma proporcional a $C$, ya que cada cliente
+participante descarga el modelo global y sube el suyo. Al representar la \textit{accuracy} frente a los MB 
+transmitidos (Figura~\ref{fig:q3_mb}), las tres curvas prácticamente se solapan, es decir, que básicamente 
+con un mismo presupuesto de comunicación, la \textit{accuracy} es similar independientemente de $C$.
+\\
+
+Con $C=1$, el mayor \textit{accuracy} final se debe a que transmite el doble que $C=0.5$ (478.1 MB frente a 239.1 MB), 
+y ese coste adicional solo aporta unos 5 puntos. La \textit{accuracy} depende principalmente del total de bytes transmitidos, 
+y lo que $C$ decide es cómo se reparten: pocos clientes en muchas rondas, con rondas baratas pero curvas inestables, 
+o muchos clientes en pocas rondas, con rondas caras pero curvas estables.
+
+\subsection{FedAvg frente FedProx}
+
+\subsection{Comunicación}
+
+\subsection{CNN}
