@@ -260,13 +260,113 @@ transmitidos (Figura~\ref{fig:q3_mb}), las tres curvas prácticamente se solapan
 con un mismo presupuesto de comunicación, la \textit{accuracy} es similar independientemente de $C$.
 \\
 
-Con $C=1$, el mayor \textit{accuracy} final se debe a que transmite el doble que $C=0.5$ (478.1 MB frente a 239.1 MB), 
-y ese coste adicional solo aporta unos 5 puntos. La \textit{accuracy} depende principalmente del total de bytes transmitidos, 
-y lo que $C$ decide es cómo se reparten: pocos clientes en muchas rondas, con rondas baratas pero curvas inestables, 
-o muchos clientes en pocas rondas, con rondas caras pero curvas estables.
+Con $C=1$, la mayor \textit{accuracy} final no se debe a transmitir más bytes en sí, sino a lo que se obtiene a
+cambio. El número de actualizaciones del modelo global es el mismo (una por ronda), pero cada una agrega 10 modelos
+locales en lugar de 5 o 3. Aunque cada cliente siga desviándose hacia su óptimo local, al promediar clientes con
+clases distintas estas desviaciones se compensan en parte, de modo que la dirección del paso global se aproxima
+más a la del óptimo global.
 
 \subsection{FedAvg frente FedProx}
+Los escenarios a evaluar son:
+\begin{itemize}
+    \item Método: FedAvg ($\mu=0$) y FedProx con $\mu \in \{0.01, 0.1, 1\}$.
+    \item Particionado: IID y Dirichlet con $\alpha=0.1$.
+\end{itemize}
+
+Todas las configuraciones se ejecutaron con 5 semillas (0--4) y el resto de la configuración es la de por defecto.
+Las ejecuciones con FedAvg son las del experimento de heterogeneidad. Como FedProx solo cambia
+la pérdida del cliente, los bytes transmitidos son los mismos en todos los casos (239.1 MB).
+
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=\textwidth]{q4_accuracy.png}
+    \caption{\textit{Accuracy} de test por ronda con FedAvg y FedProx en cada escenario. La línea es la media entre
+    semillas y la banda, $\pm$ una desviación típica.}
+    \label{fig:q4_curvas}
+\end{figure}
+
+\begin{table}[H]
+    \centering
+    \caption{Resultados del experimento FedAvg frente a FedProx (media $\pm$ desviación típica entre 5 semillas)}
+    \label{tab:q4}
+    \setlength{\tabcolsep}{4pt}
+    \begin{tabular}{llccc}
+        \hline
+        Escenario & Método & Accuracy final & Oscilación & Salto medio \\
+        \hline
+        IID & FedAvg & $0.852 \pm 0.001$ & $0.003 \pm 0.001$ & $0.002 \pm 0.001$ \\
+         & FedProx $\mu=0.01$ & $0.852 \pm 0.001$ & $0.003 \pm 0.001$ & $0.002 \pm 0.001$ \\
+         & FedProx $\mu=0.1$ & $0.850 \pm 0.001$ & $0.003 \pm 0.001$ & $0.002 \pm 0.000$ \\
+         & FedProx $\mu=1$ & $0.832 \pm 0.001$ & $0.004 \pm 0.001$ & $0.002 \pm 0.001$ \\
+        \hline
+        Dirichlet $\alpha=0.1$ & FedAvg & $0.722 \pm 0.043$ & $0.034 \pm 0.010$ & $0.040 \pm 0.012$ \\
+         & FedProx $\mu=0.01$ & $0.723 \pm 0.042$ & $0.034 \pm 0.010$ & $0.040 \pm 0.012$ \\
+         & FedProx $\mu=0.1$ & $0.724 \pm 0.041$ & $0.034 \pm 0.011$ & $0.040 \pm 0.014$ \\
+         & FedProx $\mu=1$ & $0.707 \pm 0.037$ & $0.035 \pm 0.016$ & $0.039 \pm 0.017$ \\
+        \hline
+    \end{tabular}
+\end{table}
+
+\subsubsection{¿Cómo afecta FedProx según el escenario?}
+FedProx no mejora a FedAvg en ninguno de los dos escenarios (Figura~\ref{fig:q4_curvas} y Tabla~\ref{tab:q4}).
+Con valores pequeños de $\mu$ el término proximal es despreciable frente a la entropía cruzada y se comporta
+igual que FedAvg, mientras que con $\mu=1$ empeora en ambos.
+\\
+
+El término proximal limita cuánto se aleja cada cliente de $w_t$, pero no cambia la dirección en la que avanza.
+En un escenario no-IID esto podría parecer beneficioso, ya que los clientes recorren menos camino hacia su óptimo
+local. Sin embargo, tras cada ronda siguen apuntando hacia él, de modo que se recorta por igual la desviación y
+el avance útil. Por ello, con $\mu=1$ no se obtiene ninguna mejora en el escenario no-IID, sino un resultado algo
+peor (de $0.722$ a $0.707$).
+\\
+
+En el escenario IID el resultado también empeora (de $0.852$ a $0.832$), ya que con este reparto todos los
+clientes apuntan, en promedio, hacia el óptimo global. No hay \textit{client drift} que corregir, y limitar el
+desplazamiento solo frena el avance de cada ronda, con un efecto parecido a reducir la tasa de aprendizaje.
 
 \subsection{Comunicación}
+En este experimento se compara la subida sin comprimir (\texttt{float32}) con la cuantización \texttt{int8} descrita
+en la sección de comunicación, empleando la configuración por defecto (Dirichlet con $\alpha=0.1$) y 5 semillas
+(0--4). Las ejecuciones sin comprimir son las del experimento de heterogeneidad.
+
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=\textwidth]{q5_accuracy_mb.png}
+    \caption{\textit{Accuracy} de test frente a los MB transmitidos acumulados (subida y bajada), con y sin
+    cuantización \texttt{int8}. La línea es la media entre semillas y la banda, $\pm$ una desviación típica.}
+    \label{fig:q5_mb}
+\end{figure}
+
+\begin{table}[H]
+    \centering
+    \caption{Resultados del experimento de comunicación (media $\pm$ desviación típica entre 5 semillas)}
+    \label{tab:q5}
+    \setlength{\tabcolsep}{5pt}
+    \begin{tabular}{lcccc}
+        \hline
+        Codec & Accuracy final & Oscilación & MB subida & MB total \\
+        \hline
+        \texttt{float32} & $0.722 \pm 0.043$ & $0.034 \pm 0.010$ & 119.5 & 239.1 \\
+        \texttt{int8} & $0.722 \pm 0.043$ & $0.034 \pm 0.010$ & 29.9 & 149.4 \\
+        \hline
+    \end{tabular}
+\end{table}
+
+\subsubsection{¿Cuánto se ahorra y cuánto se pierde?}
+Con la cuantización \texttt{int8} se obtiene la misma \textit{accuracy} que sin comprimir, pero con un menor coste
+de comunicación.
+\\
+
+\textbf{Ahorro.} Cada parámetro pasa de ocupar 4 bytes a ocupar 1, por lo que la subida se reduce un 75\,\% (de
+119.5 MB a 29.9 MB). Sin embargo, la bajada no se comprime y supone la mitad del tráfico, de modo que el ahorro
+sobre el total transmitido es del 37.5\,\% (de 239.1 MB a 149.4 MB).
+\\
+
+\textbf{Pérdida.} Como se observa en la Tabla~\ref{tab:q5}, la \textit{accuracy} final y la oscilación coinciden
+en ambos casos, por lo que la pérdida no es apreciable. Esto se debe a que se cuantiza la diferencia $\Delta$ respecto al modelo global y no los
+pesos. Como en una ronda los pesos cambian poco, el rango de $\Delta$ es pequeño y el error de redondeo. Además, 
+este error no se acumula, ya que en la siguiente ronda los clientes parten del nuevo modelo global.
+\\
+
 
 \subsection{CNN}
