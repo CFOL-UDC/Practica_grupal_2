@@ -9,7 +9,7 @@ from fl.clients.base import Client, ClientUpdate
 class ClienteEstadisticos(Client):
     '''No entrena con SGD: calcula las cuentas, sumas y dispersión por clase de sus datos'''
 
-    def __init__(self, cid, dataset, *, minimo=5, **kwargs):
+    def __init__(self, cid, dataset, *, minimo=5, rango=16, **kwargs):
         super().__init__(cid, dataset, **kwargs)
 
         # Solo mandamos la suma de una clase si tiene al menos este nº de ejemplos
@@ -21,6 +21,7 @@ class ClienteEstadisticos(Client):
         self.formas_enviadas = set()
         self.minimo_forma = 10  # la forma de una clase necesita mas ejemplos que su media
         self.presupuesto = 160 * 1024  # bytes que se pueden subir por ronda (lo fija el reto)
+        self.rango = rango  # RDA de bajo rango: cuantas direcciones propias manda de cada clase
 
     def local_train(self, global_model: nn.Module) -> ClientUpdate:
         '''Devuelve los estadisticos del cliente en vez de pesos entrenados'''
@@ -54,7 +55,9 @@ class ClienteEstadisticos(Client):
         # Con el modelo RDA, lo del LDA solo se manda una vez (los datos no cambian) y se deja
         # sitio para las formas. Con el modelo lineal se manda siempre, como en la version 1
         proyeccion = global_model.state_dict().get("proyeccion")
-        if proyeccion is None or not self.enviado:
+        blanqueo = global_model.state_dict().get("blanqueo")
+        rda = proyeccion is not None or blanqueo is not None
+        if not rda or not self.enviado:
             estadisticos["sumas"] = sumas[presentes].float()
             estadisticos["dispersion"] = dispersion.float()
             d = x.shape[1]
@@ -68,7 +71,48 @@ class ClienteEstadisticos(Client):
                 estadisticos["formas"] = formas.float()
                 estadisticos["formas.clases"] = clases.float()
 
+        # RDA de bajo rango: si el modelo trae el blanqueo, mandamos las direcciones propias de cada clase
+        if blanqueo is not None and blanqueo.abs().sum() > 0:
+            vectores, valores, clases = self.formas_bajo_rango(x, y, cuentas, blanqueo.double(), ocupado)
+            if len(clases) > 0:
+                estadisticos["vectores"] = vectores.float()
+                estadisticos["valores"] = valores.float()
+                estadisticos["formas.clases"] = clases.float()
+
         return ClientUpdate(self.cid, estadisticos, self.n_samples, {})
+
+    def pendientes(self, cuentas, caben):
+        '''Clases cuya forma aun no hemos mandado, primero las que tienen mas ejemplos'''
+        orden = [c for c in torch.argsort(cuentas, descending=True).tolist()
+                 if cuentas[c] >= self.minimo_forma and c not in self.formas_enviadas]
+        return torch.tensor(orden[:caben], dtype=torch.long)
+
+    def formas_bajo_rango(self, x, y, cuentas, blanqueo, ocupado):
+        '''Para cada clase, las direcciones en las que su forma mas se aleja de la comun'''
+
+        d = x.shape[1]
+        r = self.rango
+        por_clase = r * d + 8 * r + 4  # bytes ya comprimido (vectores en int8, ver el codec)
+        clases = self.pendientes(cuentas, max(0, (self.presupuesto - ocupado - 1024) // por_clase))
+
+        # Con el blanqueo la forma comun es una esfera (la identidad)
+        z = x @ blanqueo
+        vectores, valores = [], []
+        for c in clases.tolist():
+            zc = z[y == c]
+            centrados = zc - zc.mean(0)
+            forma = centrados.T @ centrados / len(zc)
+
+            # Nos quedamos con las r direcciones en las que mas difiere de la esfera
+            dif, direcciones = torch.linalg.eigh(forma - torch.eye(d, dtype=torch.float64))
+            mejores = torch.argsort(dif.abs(), descending=True)[:r]
+            vectores.append(direcciones[:, mejores].T)
+            valores.append(dif[mejores])
+            self.formas_enviadas.add(c)
+
+        if vectores:
+            return torch.stack(vectores), torch.stack(valores), clases
+        return torch.zeros(0, r, d), torch.zeros(0, r), clases
 
     def formas(self, x, y, cuentas, proyeccion, ocupado):
         '''Dispersion de cada clase en las direcciones del servidor, las que quepan en el presupuesto'''
@@ -78,9 +122,7 @@ class ClienteEstadisticos(Client):
         caben = max(0, (self.presupuesto - ocupado - 1024) // por_clase)
 
         # Primero las clases con mas ejemplos, que dan la forma mas fiable
-        pendientes = [c for c in torch.argsort(cuentas, descending=True).tolist()
-                      if cuentas[c] >= self.minimo_forma and c not in self.formas_enviadas]
-        clases = torch.tensor(pendientes[:caben], dtype=torch.long)
+        clases = self.pendientes(cuentas, caben)
 
         u = x @ proyeccion.T
         formas = []

@@ -85,15 +85,16 @@ class LDARobusto(Aggregator):
     def coherencia(self, fiables, precision):
         '''Para cada cliente, fraccion de sus ejemplos cuya clase cuadra con la del resto de clientes'''
 
-        # Media de cada clase con todos los clientes menos él
+        # Sumas y cuentas de cada clase con todos los clientes fiables        
         sumas = sum(self.sumas(c) for c in fiables)
         cuentas = sum(self.cuentas(c) for c in fiables)
 
         # Con blanqueo la distancia normal es la de Mahalanobis
         blanqueo = torch.linalg.cholesky(precision)
+        # precision -> inversa covarianza -> inversa dispersion global
         puntos = {}
 
-        for cid, e in self.estadisticos.items():
+        for cid, e in self.estadisticos.items(): # cliente y estadísticos
 
             # Medias de referencia: las del resto de clientes (le quitamos lo suyo)
             if cid in fiables:
@@ -103,25 +104,25 @@ class LDARobusto(Aggregator):
                 ref_sumas = sumas
                 ref_cuentas = cuentas
 
-            hay_ref = ref_cuentas >= self.minimo
-            clases = torch.nonzero((e["cuentas"] > 0) & hay_ref).flatten()
+            hay_ref = ref_cuentas >= self.minimo # clases que el resto tiene con al menos mínimo ejemplos
+            clases = torch.nonzero((e["cuentas"] > 0) & hay_ref).flatten() # las clases que tiene el cliente que se pueden juzgar
 
             # Si no hay con que comparar, nos fiamos
             if len(clases) == 0:
                 puntos[cid] = 1.0
-                continue
+                continue 
 
-            ref = ref_sumas[hay_ref] / ref_cuentas[hay_ref].unsqueeze(1)
-            suyas = e["sumas"][clases] / e["cuentas"][clases].unsqueeze(1)
-            dist = torch.cdist(suyas @ blanqueo, ref @ blanqueo) ** 2
+            ref = ref_sumas[hay_ref] / ref_cuentas[hay_ref].unsqueeze(1) # medias de referencia
+            suyas = e["sumas"][clases] / e["cuentas"][clases].unsqueeze(1) # medias del cliente
+            dist = torch.cdist(suyas @ blanqueo, ref @ blanqueo) ** 2 # lo lejos que está cada media del cliente de cada media de referencia
 
             # 1. Cada media suya tiene que estar mas cerca de su clase que de cualquier otra
             indice_ref = torch.nonzero(hay_ref).flatten()
             mas_cercana = indice_ref[dist.argmin(1)] == clases
 
-            # 2. Y a la distancia normal por azar: unas d * (1/n + 1/N)
-            propia = dist[torch.arange(len(clases)), torch.searchsorted(indice_ref, clases)]
-            esperada = precision.shape[0] * (1 / e["cuentas"][clases] + 1 / ref_cuentas[clases])
+            # 2. Y a la distancia normal por azar: unas d * (1/n + 1/N) -> si está cerca de verdad
+            propia = dist[torch.arange(len(clases)), torch.searchsorted(indice_ref, clases)] # distancia a su clase
+            esperada = precision.shape[0] * (1 / e["cuentas"][clases] + 1 / ref_cuentas[clases]) # distancia normal por azar
             self.z[cid] = propia / esperada
 
             aciertos = mas_cercana & (self.z[cid] < self.max_z)

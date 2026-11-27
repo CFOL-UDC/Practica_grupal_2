@@ -156,3 +156,89 @@ Ningún cliente honrado marcado en ninguna prueba.
   direcciones son peores; pesa más lo segundo.
 - `mezcla` (con `fijar_con = 30`): 0,2 → 80,4 %; **0,3 → 80,6 %**; 0,4 → 80,4 %; 0,5 → 80,1 %.
 - Solo la diagonal de cada forma (sin direcciones): no mejora (77,3 %).
+
+---
+
+# Versión 3: más direcciones (160)
+
+**Estado:** confirmada con el simulador.
+
+Con 99 direcciones (las que separan las medias) la forma de cada clase solo se mira en una parte
+del espacio. En centralizado, añadir direcciones al azar (perpendiculares a esas) mejora casi tanto
+como elegirlas mirando las formas: 99 → 81,5 %; 99 + 29 al azar → 82,0 %; las 384 → 82,3 %. Cada
+forma ocupa más (160 direcciones: ~13,5 KB por clase en vez de ~5,3 KB), así que cada cliente manda
+menos formas por subida; el equilibrio sale a favor.
+
+| Direcciones (semillas 0–2) | 99 | 128 | 160 | 200 | 256 |
+|---|---|---|---|---|---|
+| Accuracy | 80,7 % | 80,9 % | 81,1 % | 81,1 % | 80,3 % |
+
+Con 160 direcciones se reajusta `mezcla`: 0,2 → 81,5 %; **0,25 → 81,4 %**; 0,3 → 81,1 %;
+0,4 → 80,7 % (semillas 0–2). Se elige 0,25 y se confirma con semillas no usadas para ajustar.
+
+| Escenario | v2 (99, α = 0,3) | **v3 (160, α = 0,25)** |
+|---|---|---|
+| Sin atacantes, semillas 3–8 | 80,2 % | **81,2 %** |
+| 20 % atacantes, `mezcla` | 80,4 % | **81,0 %** |
+| 20 % atacantes, ruido | 80,1 % | **80,6 %** |
+| 20 % atacantes, permutar | 80,1 % | **80,6 %** |
+| 30 % atacantes (también sobre enteros) | 79,3 % | 79,3 % |
+| «Todo a la clase 0» | 80,2 % | **80,5 %** |
+
+Probado y descartado en esta versión: mezcla adaptativa según los ejemplos de cada clase (no
+mejora: el 85 % de los ejemplos ya llega con forma y todas las clases tienen alguna) y normalizar
+los embeddings (centrar + L2: +0,02 puntos con RDA).
+
+---
+
+# Versión 4: RDA de bajo rango (la forma de cada clase en sus propias direcciones)
+
+**Estado:** confirmada con el simulador. Es la configuración actual de `configs/reto.yaml`.
+
+## Diagnóstico
+
+Con la v3, ni el presupuesto ni la cuantización limitaban: sin límite de subida y sin int8 sale
+lo mismo (81,4 %). Lo que limitaba era mirar la forma de las clases en solo 160 direcciones
+**comunes**. Con la forma completa (384) y sin límite de subida, el federado llega a **82,4 %**
+(α = 0,1), al nivel de la regresión logística centralizada (~82,3 %).
+
+La forma completa no cabe (~74 KB por clase), pero no hace falta: en centralizado, quedarse con
+las r direcciones en las que **cada clase** más se aparta de la forma común da casi lo mismo
+(r = 8: 82,1 %; 16: 82,3 %; 32: 82,7 %; completa: 82,7 %).
+
+## Decisión
+
+- **Blanqueo:** cuando hay 30 clientes fiables, el servidor fija la matriz que convierte la forma
+  común en una esfera (Σ^-1/2) y la manda dentro del modelo (buffer `blanqueo`).
+- **Cliente:** para cada clase (≥ 10 ejemplos), calcula su forma en el espacio blanqueado y manda
+  las **16 direcciones** en las que más se aparta de la esfera (autovectores) y cuánto
+  (autovalores). ~6,3 KB por clase, frente a 13,5 KB de la v3.
+- **Codec:** vectores en int8 con una escala por vector; valores en float32.
+- **Agregador (`RDABajoRango`):** integridad y coherencia como en la v1, más comprobaciones de lo
+  nuevo (los vectores miden 1, ningún valor deja una varianza negativa). Reconstruye la forma de
+  cada clase de cada cliente (esfera + sus 16 direcciones), las junta como la dispersión del LDA,
+  mezcla con la común (α = 0,1) y se queda con las **128 direcciones** principales de la
+  corrección de cada clase. Es lo caro, así que se calcula en la última ronda (y cada 5).
+- **Modelo (`ModeloRDABajoRango`):** LDA − ½ · Σ valor · (proyección de x − proyección del centro)²
+  en las 128 direcciones propias de cada clase.
+
+## Ajustes (semillas 0–2)
+
+| | Accuracy |
+|---|---|
+| r = 8 / **16** / 32 (cliente) | 81,9 / **81,9** / 81,6 % (con 48 direcciones en el modelo) |
+| 48 / 96 / **128** / 160 / 384 direcciones en el modelo | 81,9 / 82,2 / **82,4** / 82,4 / 82,4 % |
+| α = 0,07 / **0,1** / 0,12 / 0,15 | 81,9 / **82,4** / 82,4 / 81,7 % |
+
+## Resultados
+
+| Escenario | v3 | **v4** |
+|---|---|---|
+| Sin atacantes, semillas 3–8 (no usadas para ajustar) | 81,2 % | **82,1 %** |
+| 20 % atacantes, `mezcla` | 81,0 % | **82,1 %** |
+| 20 % atacantes, ruido / permutar | 80,6 % | **81,8 %** |
+| 20 % atacantes, también sobre enteros | 80,8 % | **82,0 %** |
+| 30 % atacantes | 79,3 % | **80,8 %** |
+| «Todo a la clase 0» | 80,5 % | **81,9 %** |
+
+Ningún cliente honrado marcado en ninguna prueba. ~20 s por semilla en el contenedor de pruebas.

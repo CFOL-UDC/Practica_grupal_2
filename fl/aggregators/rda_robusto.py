@@ -11,7 +11,7 @@ class RDARobusto(LDARobusto):
     '''Igual que LDARobusto (integridad, coherencia y LDA), pero ademas mezcla la forma comun
     con la forma de cada clase en unas pocas direcciones (analisis discriminante regularizado)'''
 
-    def __init__(self, contraccion=0.01, umbral=0.5, minimo=5, mezcla=0.3, clientes_para_fijar=30):
+    def __init__(self, contraccion=0.01, umbral=0.5, minimo=5, mezcla=0.25, clientes_para_fijar=30):
         super().__init__(contraccion, umbral, minimo)
         self.mezcla = mezcla  # cuanto de la forma propia de cada clase (0 = LDA)
         self.clientes_para_fijar = clientes_para_fijar  # con cuantos clientes fijamos las direcciones
@@ -63,7 +63,7 @@ class RDARobusto(LDARobusto):
 
 
     def fijar_direcciones(self, fiables, covarianza):
-        '''Las direcciones en las que mas se separan las medias de las clases (las del propio LDA)'''
+        '''Las direcciones en las que mas se separan las medias de las clases (las del propio LDA), y si se piden mas, otras al azar'''
 
         cuentas = sum(self.cuentas(c) for c in fiables)
         sumas = sum(self.sumas(c) for c in fiables)
@@ -76,10 +76,21 @@ class RDARobusto(LDARobusto):
         medias = medias @ blanqueo
         medias = medias - medias.mean(0)
 
-        # Las direcciones principales de esas medias
+        # Las direcciones principales de esas medias (como mucho una menos que clases)
         _, _, vt = torch.linalg.svd(medias, full_matrices=False)
-        k = min(self.global_state["proyeccion"].shape[0], int(vistas.sum()) - 1)
-        self.proyeccion = vt[:k] @ blanqueo
+        total = self.global_state["proyeccion"].shape[0]
+        k = min(total, int(vistas.sum()) - 1)
+        direcciones = vt[:k].T
+
+        # Si se piden mas, se completan con direcciones al azar perpendiculares a esas
+        if total > k:
+            g = torch.Generator().manual_seed(0)
+            extra = torch.randn(direcciones.shape[0], total - k, generator=g, dtype=torch.float64)
+            extra = extra - direcciones @ (direcciones.T @ extra)
+            extra, _ = torch.linalg.qr(extra)
+            direcciones = torch.cat([direcciones, extra], dim=1)
+
+        self.proyeccion = direcciones.T @ blanqueo
 
 
     def aggregate(self, updates: list[ClientUpdate]) -> StateDict:

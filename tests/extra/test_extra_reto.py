@@ -161,7 +161,7 @@ def test_cliente_rda_cabe_en_el_presupuesto():
     x = torch.randn(3000, 384, generator=g)
     y = torch.arange(100).repeat_interleave(30)  # el peor caso: las 100 clases
     cliente = ClienteEstadisticos(0, TensorDataset(x, y), minimo=5)
-    modelo = ModeloRDA(384, 100, 99)
+    modelo = ModeloRDA(384, 100, 160)
     modelo.proyeccion.normal_()
     codec = estadisticosCodeDecode()
     for _ in range(3):  # primera vez (LDA + formas) y las siguientes (solo formas)
@@ -199,5 +199,53 @@ def test_rda_usa_las_formas_y_descarta_las_manipuladas():
     assert agregador.descartados == {4}
     assert len(agregador.formas) == len(GRUPOS) - 1
     assert modelo.curvatura.abs().sum() > 0
+    xt, yt = nubes(semilla=1)
+    assert (modelo(xt).argmax(1) == yt).float().mean() > 0.95
+
+
+# ---- Version 4: RDA de bajo rango ----
+
+from fl.aggregators.rda_bajo_rango import RDABajoRango
+from fl.reto_models import ModeloRDABajoRango
+
+
+def test_modelo_rda2_sin_correccion_es_el_lineal():
+    modelo = ModeloRDABajoRango(D, C, 4)
+    with torch.no_grad():
+        modelo.weight.normal_()
+        modelo.bias.normal_()
+    x = torch.randn(7, D)
+    assert torch.allclose(modelo(x), x @ modelo.weight.T + modelo.bias)
+
+
+def test_cliente_rda2_cabe_en_el_presupuesto():
+    g = torch.Generator().manual_seed(0)
+    x = torch.randn(3000, 384, generator=g)
+    y = torch.arange(100).repeat_interleave(30)  # el peor caso: las 100 clases
+    cliente = ClienteEstadisticos(0, TensorDataset(x, y), minimo=5, rango=16)
+    modelo = ModeloRDABajoRango(384, 100, 128)
+    modelo.blanqueo.copy_(torch.eye(384))
+    codec = estadisticosCodeDecode()
+    for _ in range(3):  # primera vez (LDA + formas) y las siguientes (solo formas)
+        payload = codec.encode(cliente.local_train(modelo).state_dict, modelo.state_dict())
+        assert sum(t.numel() * t.element_size() for t in payload.values()) <= 160 * 1024
+
+
+def test_rda2_usa_las_formas_y_descarta_las_manipuladas():
+    x, y = nubes()
+    cls = clientes(x, y, GRUPOS)
+    for c in cls:
+        c.rango = 4
+    modelo = ModeloRDABajoRango(D, C, 8)
+    agregador = RDABajoRango(clientes_para_fijar=len(GRUPOS))
+    ronda_rda(cls, agregador, modelo)  # 1ª ronda: LDA y se fija el blanqueo
+    assert agregador.blanqueo is not None
+
+    g = torch.Generator().manual_seed(0)
+    ruido = {4: lambda p: {k: v + 0.1 * v.abs().max() * torch.randn(v.shape, generator=g) if v.is_floating_point() else v
+                           for k, v in p.items()}}
+    ronda_rda(cls, agregador, modelo, ruido)  # 2ª ronda: las formas
+    assert agregador.descartados == {4}
+    assert modelo.valores.abs().sum() > 0
     xt, yt = nubes(semilla=1)
     assert (modelo(xt).argmax(1) == yt).float().mean() > 0.95

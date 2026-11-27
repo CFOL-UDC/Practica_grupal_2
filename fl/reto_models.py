@@ -22,7 +22,9 @@ def build_reto_model(cfg: Config) -> nn.Module:
         # ~97 000 parámetros: en float32 no cabe en el presupuesto de subida (hace falta comprimir)
         return nn.Sequential(nn.Linear(IN_FEATURES, cfg.hidden), nn.ReLU(), nn.Linear(cfg.hidden, N_CLASSES))
     if cfg.name == "rda":
-        return ModeloRDA(IN_FEATURES, N_CLASSES, cfg.get("direcciones", 99))
+        return ModeloRDA(IN_FEATURES, N_CLASSES, cfg.get("direcciones", 160))
+    if cfg.name == "rda2":
+        return ModeloRDABajoRango(IN_FEATURES, N_CLASSES, cfg.get("rango", 128))
     raise ValueError(f"Modelo desconocido: {cfg.name!r}")
 
 
@@ -48,5 +50,33 @@ class ModeloRDA(nn.Module):
         u = x @ self.proyeccion.T
         d = u.unsqueeze(1) - self.centros.unsqueeze(0)
         cuadratica = torch.einsum("ncj,cjk,nck->nc", d, self.curvatura, d)
+
+        return lineal - 0.5 * cuadratica
+
+
+
+class ModeloRDABajoRango(nn.Module):
+    '''LDA (parte lineal) + una correccion cuadratica por clase en sus propias direcciones'''
+
+    def __init__(self, dim, n_clases, rango):
+        super().__init__()
+
+        # La parte lineal: el LDA de siempre
+        self.weight = nn.Parameter(torch.zeros(n_clases, dim))
+        self.bias = nn.Parameter(torch.zeros(n_clases))
+
+        # Lo calcula el servidor (buffers, no se entrenan)
+        self.register_buffer("blanqueo", torch.zeros(dim, dim))  # lo necesitan los clientes
+        self.register_buffer("centros", torch.zeros(n_clases, dim))  # media de cada clase
+        self.register_buffer("vectores", torch.zeros(n_clases, rango, dim))  # direcciones propias de cada clase
+        self.register_buffer("valores", torch.zeros(n_clases, rango))  # cuanto pesa cada una
+
+    def forward(self, x):
+        lineal = x @ self.weight.T + self.bias
+
+        # Lo lejos que esta x del centro de cada clase en sus direcciones propias
+        proyectado = torch.einsum("nd,crd->ncr", x, self.vectores)
+        centro = torch.einsum("cd,crd->cr", self.centros, self.vectores)
+        cuadratica = ((proyectado - centro) ** 2 * self.valores).sum(2)
 
         return lineal - 0.5 * cuadratica

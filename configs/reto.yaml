@@ -7,21 +7,23 @@
 # Estrategia (decisiones/reto-estrategia.md): los clientes suben estadísticos de sus datos
 # (ClienteEstadisticos) y el servidor calcula en forma cerrada el clasificador, descartando a los
 # clientes cuyo envío está manipulado o cuyas etiquetas no son coherentes.
-#   - Versión 1 (LDA):  model.name=linear, server.aggregator=lda_robusto
-#   - Versión 2 (RDA):  model.name=rda,    server.aggregator=rda_robusto   <- la actual
+#   - Versión 1 (LDA):           model.name=linear, server.aggregator=lda_robusto
+#   - Versiones 2 y 3 (RDA):     model.name=rda,    server.aggregator=rda_robusto
+#   - Versión 4 (RDA bajo rango): model.name=rda2,  server.aggregator=rda_bajo_rango   <- la actual
 
 model:
-  name: rda               # lo interpreta fl/reto_models.py
-  direcciones: 99         # direcciones para la forma de cada clase
+  name: rda2              # lo interpreta fl/reto_models.py
+  rango: 128              # direcciones propias de cada clase en el modelo final
 
 client:
   estadisticos: true      # el cliente no entrena con SGD: sube cuentas, sumas, dispersión y formas
+  rango: 16               # direcciones propias que manda el cliente de cada una de sus clases
 
 server:
-  aggregator: rda_robusto
-  codec: estadisticos     # dispersión y formas en int8 por filas + sumas en float16 (< 160 KiB)
+  aggregator: rda_bajo_rango
+  codec: estadisticos     # dispersión y formas en int8 + sumas en float16 (< 160 KiB)
   contraccion: 0.01
   umbral_coherencia: 0.5
   minimo_clase: 5
-  mezcla: 0.3             # cuánto de la forma propia de cada clase (0 = LDA)
-  fijar_con: 30           # con cuántos clientes fiables se fijan las direcciones
+  mezcla: 0.1             # cuánto de la forma propia de cada clase (0 = LDA)
+  fijar_con: 30           # con cuántos clientes fiables se fija el blanqueo

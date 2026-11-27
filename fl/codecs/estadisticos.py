@@ -72,6 +72,16 @@ class estadisticosCodeDecode(Codec):
             comprimido["formas.escala"] = torch.stack([p[1] for p in partes])
             comprimido["formas.clases"] = state["formas.clases"].float()
 
+        # RDA de bajo rango: vectores en int8 con una escala por vector, valores en float32
+        if "vectores" in state:
+            vectores = state["vectores"]
+            escala = (vectores.abs().amax(dim=2) / 127).clamp(min=1e-12)
+            cuantizado = torch.clamp(torch.round(vectores / escala.unsqueeze(2)), min=-127, max=127)
+            comprimido["vectores"] = cuantizado.to(torch.int8)
+            comprimido["vectores.escala"] = escala.float()
+            comprimido["valores"] = state["valores"].float()
+            comprimido["formas.clases"] = state["formas.clases"].float()
+
         return comprimido
 
 
@@ -96,6 +106,12 @@ class estadisticosCodeDecode(Codec):
                 escalas = comprimido["formas.escala"].float()
                 formas = [descomprimir_simetrica(v, e) for v, e in zip(comprimido["formas"], escalas)]
                 estadisticos["formas"] = torch.stack(formas)
+                estadisticos["formas.clases"] = comprimido["formas.clases"].float()
+
+            if "vectores" in comprimido:
+                escala = comprimido["vectores.escala"].float()
+                estadisticos["vectores"] = comprimido["vectores"].float() * escala.unsqueeze(2)
+                estadisticos["valores"] = comprimido["valores"].float()
                 estadisticos["formas.clases"] = comprimido["formas.clases"].float()
 
         except (KeyError, RuntimeError, IndexError, ValueError):
