@@ -78,11 +78,12 @@ EXPERIMENTS = {
     "q5": [run for codec in [[], INT8] for run in with_seeds(DIR_01 + codec, SEEDS_5)],
     # Q6. El experimento 1 con la CNN, y las mismas ejecuciones del MLP para comparar.
     "q6": heterogeneity(CNN, SEEDS_3, SEEDS_3) + heterogeneity([], SEEDS_3, SEEDS_3),
-    # Variantes de la CNN: la elegida (5x5), filtros 3x3 y con GroupNorm. Las de "cnn" se comparten con Q6.
+    # Variantes de la CNN: la inicial sin normalizar (5x5), con filtros 3x3 y la elegida, con GroupNorm.
+    # Las de la elegida ("cnn") se comparten con Q6.
     "cnn": [
         run
         for data in [IID, DIR_01]
-        for name in ["cnn", "cnn3x3", "cnn_gn"]
+        for name in ["cnn_base", "cnn3x3", "cnn"]
         for run in with_seeds(data + [f"model.name={name}"], SEEDS_3)
     ],
 

@@ -4,7 +4,7 @@ import torch
 
 import pytest
 
-from fl.models import CNN, CNN_MAX_PARAMS, MLP, CNN3x3, CNNGroupNorm, build_model, count_params
+from fl.models import CNN, CNN_MAX_PARAMS, MLP, CNN3x3, CNNSinNorm, build_model, count_params
 from fl.utils import load_config
 
 
@@ -23,11 +23,12 @@ def test_salidas_con_un_solo_ejemplo():
 
 
 def test_cnn_dentro_del_limite():
-    assert count_params(CNN()) == 83_466 <= CNN_MAX_PARAMS
+    assert count_params(CNN()) == 83_658 <= CNN_MAX_PARAMS
 
 
 def test_state_dict_solo_tiene_parametros_float():
-    # Sin BatchNorm no hay buffers (running_mean, num_batches_tracked): FedAvg e int8 solo ven floats.
+    # GroupNorm, a diferencia de BatchNorm, no guarda buffers (running_mean, num_batches_tracked):
+    # FedAvg e int8 solo ven floats.
     for model in (MLP(), CNN()):
         state = model.state_dict()
         assert set(state) == {name for name, _ in model.named_parameters()}
@@ -35,7 +36,7 @@ def test_state_dict_solo_tiene_parametros_float():
 
 
 @pytest.mark.parametrize("name, cls, params", [
-    ("cnn", CNN, 83_466), ("cnn3x3", CNN3x3, 50_186), ("cnn_gn", CNNGroupNorm, 83_658), ("mlp", MLP, 199_210),
+    ("cnn", CNN, 83_658), ("cnn_base", CNNSinNorm, 83_466), ("cnn3x3", CNN3x3, 50_186), ("mlp", MLP, 199_210),
 ])
 def test_build_model(name, cls, params):
     model = build_model(load_config(overrides=[f"model.name={name}"]).model)
@@ -44,8 +45,8 @@ def test_build_model(name, cls, params):
 
 
 def test_variantes_sin_buffers_enteros():
-    # GroupNorm, a diferencia de BatchNorm, no guarda estadísticas: FedAvg solo promedia parámetros.
-    for model in (CNN3x3(), CNNGroupNorm()):
+    # Las variantes tampoco tienen buffers: FedAvg solo promedia parámetros.
+    for model in (CNN3x3(), CNNSinNorm()):
         assert set(model.state_dict()) == {name for name, _ in model.named_parameters()}
 
 

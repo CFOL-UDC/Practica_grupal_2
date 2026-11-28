@@ -52,7 +52,7 @@ LAYOUT = {
     "clientes": ("Número de clientes (Dirichlet α=0,1, 5 por ronda)", None, "clients", False),
 }
 
-MODEL_NAMES = {"mlp": "MLP", "cnn": "CNN", "cnn3x3": "CNN 3×3", "cnn_gn": "CNN + GroupNorm"}
+MODEL_NAMES = {"mlp": "MLP", "cnn": "CNN", "cnn_base": "CNN sin GroupNorm", "cnn3x3": "CNN 3×3 sin GroupNorm"}
 CODEC_NAMES = {"none": "float32", "int8": "int8", "topk": "top-k"}
 
 LAST_FINAL, LAST_STABILITY = 5, 10
