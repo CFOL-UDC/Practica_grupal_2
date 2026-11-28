@@ -1,6 +1,7 @@
 # 01 · Arquitectura de la CNN
 
-**Estado:** propuesta, pendiente de la comparación de la sección 6.
+**Estado:** decidida. Tras la comparación de la sección 6 se eligió **A + GroupNorm**, que pasa a ser
+la clase `CNN` (`model.name=cnn`); A queda como `CNNSinNorm` (`cnn_base`) y B como `CNN3x3` (`cnn3x3`).
 **Afecta a:** `fl/models.py` (clase `CNN`), pregunta 6 de la memoria y, de forma indirecta, la
 pregunta 5 (bytes transmitidos).
 
@@ -186,9 +187,16 @@ ejecuciones**. Las de la candidata que quede se reutilizan en la pregunta 6.
 
 | Variante | IID: acc. final | IID: estabilidad | α=0,1: acc. final | α=0,1: estabilidad | s/ronda |
 |---|---|---|---|---|---|
-| A | | | | | |
-| B | | | | | |
-| A + GroupNorm | | | | | |
+| A | 0,883 ± 0,002 | 0,004 ± 0,001 | 0,782 ± 0,046 | 0,024 ± 0,006 | 6–8 |
+| B | 0,880 ± 0,002 | 0,004 ± 0,000 | 0,775 ± 0,037 | 0,027 ± 0,006 | 7 |
+| A + GroupNorm | 0,903 ± 0,003 | 0,005 ± 0,002 | 0,833 ± 0,033 | 0,020 ± 0,005 | 6–8 |
+
+Los tiempos por ronda no son comparables entre sí: las ejecuciones se lanzaron en paralelo.
+
+**Resultado.** B queda dentro del ruido. A + GroupNorm supera a A en las 3 semillas de los dos repartos:
++2,0 puntos en IID y +5,2 en α=0,1, por encima de la desviación típica de ambas (0,046 y 0,033). Según
+el criterio fijado, se elige **A + GroupNorm**. La selección se hizo sobre el test, porque la práctica
+no tiene conjunto de validación (riesgo 2 de la sección 5); la memoria lo reconoce.
 
 ## 7. Texto para la memoria
 

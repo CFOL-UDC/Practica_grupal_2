@@ -12,3 +12,65 @@ de PyTorch (\texttt{cross\_entropy}) la incorpora internamente. El número de ne
 \texttt{hidden} de la configuración, y con el valor por defecto el modelo tiene 199.210 parámetros.
 
 \subsection{CNN}
+Como punto de partida se tomó la red convolucional del artículo original de FedAvg~\cite{mcmahan}, formada por dos
+convoluciones $5 \times 5$ de 32 y 64 canales, cada una seguida de ReLU y \textit{max pooling} $2 \times 2$, una
+capa densa de 512 neuronas y la capa de salida. Esta red tiene 1.663.370 parámetros, de los que el 96.6\,\%
+pertenecen a la capa densa, por lo que se eliminó dicha capa para cumplir con el límite de 100.000 parámetros,
+manteniendo las convoluciones tal y como aparecen en el artículo. Además, se tomaron las siguientes decisiones de
+diseño, orientadas al entrenamiento federado con datos no-IID:
+
+\begin{itemize}
+    \item \textbf{Sin BatchNorm}: esta capa normaliza con la media y la varianza de cada mini-lote, que con datos
+    no-IID dependen de la distribución local del cliente y no se parecen a las del conjunto global, lo que degrada
+    FedAvg~\cite{hsieh}.
+    \item \textbf{Red ancha y poco profunda}: con datos no-IID, aumentar la profundidad empeora los resultados,
+    mientras que aumentar la anchura los mejora~\cite{divergencia}. Por ello, los parámetros se emplean en canales
+    y no en capas.
+    \item \textbf{Aplanado y capa lineal}: en lugar de \textit{global average pooling}, que con datos no-IID deja
+    una entrada demasiado pequeña al clasificador y empeora el resultado~\cite{divergencia}.
+    \item \textbf{Sin \textit{dropout} ni \textit{weight decay}}, y con los mismos hiperparámetros de entrenamiento
+    que el MLP, de modo que la comparación entre ambos modelos solo dependa de la arquitectura.
+\end{itemize}
+
+A partir de este diseño se consideraron tres variantes:
+
+\begin{itemize}
+    \item \textbf{CNN sin GroupNorm} (83.466 parámetros): la red descrita, que fue la variante inicial.
+    \item \textbf{CNN $3 \times 3$ sin GroupNorm} (50.186 parámetros): la misma red con filtros $3 \times 3$, con
+    menor campo receptivo y menor coste.
+    \item \textbf{CNN con GroupNorm} (83.658 parámetros): la variante inicial con GroupNorm~\cite{groupnorm} tras
+    cada convolución, con 8 grupos. A diferencia de BatchNorm, normaliza cada ejemplo por separado, sin emplear
+    estadísticas del mini-lote, por lo que no presenta el problema anterior y recupera gran parte de la pérdida
+    que sufren los modelos normalizados con datos no-IID~\cite{hsieh}.
+\end{itemize}
+
+Para la elección de la mejor variante de CNN se tomó como criterio la \textit{accuracy} final sobre el conjunto de
+test, calculada como la media de las 5 últimas rondas de cada ejecución y promediada entre 3 semillas, con IID y
+Dirichlet $\alpha=0.1$. Se mantendría la variante inicial salvo que otra la superase en $\alpha=0.1$ por más de una
+desviación típica:
+
+\begin{table}[H]
+    \centering
+    \caption{\textit{Accuracy} final de las variantes de CNN (media $\pm$ desviación típica entre 3 semillas)}
+    \label{tab:cnn_variantes}
+    \setlength{\tabcolsep}{5pt}
+    \begin{tabular}{lccc}
+        \hline
+        Variante & Parámetros & IID & Dirichlet $\alpha=0.1$ \\
+        \hline
+        CNN sin GroupNorm & 83.466 & $0.883 \pm 0.002$ & $0.782 \pm 0.046$ \\
+        CNN $3 \times 3$ sin GroupNorm & 50.186 & $0.880 \pm 0.002$ & $0.775 \pm 0.037$ \\
+        CNN con GroupNorm & 83.658 & $0.903 \pm 0.003$ & $0.833 \pm 0.033$ \\
+        \hline
+    \end{tabular}
+\end{table}
+
+Emplear los datos de test para una decisión de diseño no resulta adecuado, ya que este conjunto debe ser
+independiente de cualquier decisión tomada sobre el modelo. Sin embargo, la implementación de un conjunto de
+validación para realizar la selección escapa al alcance de esta práctica, por lo que se decidió trabajar de esta
+manera.
+\\
+
+La variante $3 \times 3$ queda dentro de la variación entre semillas, mientras que la variante con GroupNorm supera
+a la inicial en 2.0 puntos con IID y en 5.2 con $\alpha=0.1$, por encima de la desviación típica de ambas. Por ello,
+se eligió la CNN con GroupNorm, implementada en la clase \texttt{CNN}.
